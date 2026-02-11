@@ -1,27 +1,41 @@
 
 
-# Fix: Add Missing CORS Method Header for PUT Requests
+# Collapsible Layer 2 "Reasoning" Section
 
-## Problem
-Every PUT request from the browser fails with "Failed to fetch," even with tiny payloads like `{"published": true}`. The edge function works fine when called directly (server-side), confirming the logic is correct.
-
-The root cause is a missing `Access-Control-Allow-Methods` header in the CORS configuration. PUT is not a "simple" HTTP method, so browsers send an OPTIONS preflight request first. The preflight response must include `Access-Control-Allow-Methods` listing PUT (and DELETE). Without it, the browser blocks the actual request.
-
-## Solution
-Add `Access-Control-Allow-Methods` to the CORS headers in the edge function.
+## Overview
+Wrap the entire Layer 2 section in a Radix Collapsible so users see only a "Reasoning" button by default. Clicking it reveals the existing accordion bullets (title, summary, expandable detail) unchanged. No database or data structure changes required.
 
 ## Changes
 
-### `supabase/functions/admin-nodes/index.ts`
-Add one line to the `corsHeaders` object:
+### `src/pages/NodeDetail.tsx`
+- Import `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent` from `@/components/ui/collapsible`
+- Wrap the Layer 2 `<section>` contents in a `<Collapsible>` root
+- Replace the current static heading row with a `<CollapsibleTrigger>` styled as a clickable button showing the BookOpen icon, "Reasoning" label, and a chevron that rotates on open
+- Move the `<Accordion>` block inside `<CollapsibleContent>` so it only renders when expanded
+- Add a subtle open/close animation via Tailwind classes
 
+### Visual Behavior
 ```text
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",   // <-- ADD THIS
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-password, ..."
-};
+COLLAPSED (default):
++--------------------------------------+
+|  [icon] Reasoning            [chevron]|
++--------------------------------------+
+
+EXPANDED (after click):
++--------------------------------------+
+|  [icon] Reasoning            [chevron]|
+|                                      |
+|  > Bullet 1 title + summary         |
+|  > Bullet 2 title + summary         |
+|  > Bullet 3 title + summary         |
++--------------------------------------+
 ```
 
-No other files need to change. The function will be redeployed automatically.
+Each bullet inside still expands individually via the existing accordion to show its detail text. The two levels nest naturally: Collapsible controls visibility of the whole section, Accordion controls individual bullets.
 
+## What Does NOT Change
+- Database schema / `nodes` table
+- `layer2_json` structure
+- Layer 1 (always visible)
+- Layer 3 ("Next Steps")
+- Individual accordion bullet behavior
