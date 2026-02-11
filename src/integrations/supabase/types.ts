@@ -14,7 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      nodes: {
+        Row: {
+          alt_phrasings: Json | null
+          category: string | null
+          id: string
+          keywords: string | null
+          layer1: string | null
+          layer2_json: Json | null
+          layer3_json: Json | null
+          published: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          alt_phrasings?: Json | null
+          category?: string | null
+          id: string
+          keywords?: string | null
+          layer1?: string | null
+          layer2_json?: Json | null
+          layer3_json?: Json | null
+          published?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          alt_phrasings?: Json | null
+          category?: string | null
+          id?: string
+          keywords?: string | null
+          layer1?: string | null
+          layer2_json?: Json | null
+          layer3_json?: Json | null
+          published?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
