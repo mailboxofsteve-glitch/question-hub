@@ -59,7 +59,7 @@ export function useNodeSearch() {
 
       if (query.trim()) {
         const term = `%${query.trim()}%`;
-        q = q.or(`title.ilike.${term},keywords.ilike.${term},layer1.ilike.${term},alt_phrasings::text.ilike.${term}`);
+        q = q.or(`title.ilike.${term},keywords.ilike.${term},layer1.ilike.${term}`);
       }
 
       q = q.limit(50);
