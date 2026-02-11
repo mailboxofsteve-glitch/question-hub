@@ -57,9 +57,20 @@ const AdminDashboard = ({ password, onLogout }: AdminDashboardProps) => {
   const handleUpdate = async (data: Partial<Node> & { id: string; title: string }) => {
     setSaving(true);
     try {
+      // Only send fields that actually changed to avoid hitting size limits
+      const changes: Record<string, unknown> = {};
+      if (editingNode) {
+        for (const key of Object.keys(data) as Array<keyof typeof data>) {
+          if (key === 'id') continue;
+          if (JSON.stringify(data[key]) !== JSON.stringify(editingNode[key])) {
+            changes[key] = data[key];
+          }
+        }
+      }
+      const payload = Object.keys(changes).length > 0 ? changes : data;
       await adminFetch(`/${encodeURIComponent(data.id)}`, password, {
         method: 'PUT',
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
       toast({ title: 'Node updated' });
       setView('list');
