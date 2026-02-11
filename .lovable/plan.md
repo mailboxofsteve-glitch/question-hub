@@ -1,41 +1,37 @@
 
 
-# Collapsible Layer 2 "Reasoning" Section
+# Fix: Include Alt Phrasings in Search
 
-## Overview
-Wrap the entire Layer 2 section in a Radix Collapsible so users see only a "Reasoning" button by default. Clicking it reveals the existing accordion bullets (title, summary, expandable detail) unchanged. No database or data structure changes required.
+## Problem
+The `alt_phrasings` JSONB array is not included in the search query. Typing "Is there" drops "Does God exist?" even though "Is there a God?" is stored as an alt phrasing.
 
 ## Changes
 
-### `src/pages/NodeDetail.tsx`
-- Import `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent` from `@/components/ui/collapsible`
-- Wrap the Layer 2 `<section>` contents in a `<Collapsible>` root
-- Replace the current static heading row with a `<CollapsibleTrigger>` styled as a clickable button showing the BookOpen icon, "Reasoning" label, and a chevron that rotates on open
-- Move the `<Accordion>` block inside `<CollapsibleContent>` so it only renders when expanded
-- Add a subtle open/close animation via Tailwind classes
+### `src/hooks/use-node-search.ts`
 
-### Visual Behavior
+**1. Add `alt_phrasings` to the selected columns and interface**
+- Update `NodeSearchResult` interface to include `alt_phrasings: string[] | null`
+- Update the `.select()` call to include `alt_phrasings`
+
+**2. Add `alt_phrasings` to the database filter**
+- Supabase's `ilike` doesn't work directly on JSONB arrays, but casting to text works: `alt_phrasings::text`
+- Update the `.or()` filter to include `alt_phrasings::text.ilike.${term}`
+
+**3. Add alt phrasing scoring to `scoreResult`**
+- Add a +5 weight for alt phrasing matches (between title-starts-with and title-contains, since an exact alt phrasing match is a strong relevance signal)
+- Cast the JSONB array to a joined string and check if it includes the search term
+
+### Scoring Weights (updated)
 ```text
-COLLAPSED (default):
-+--------------------------------------+
-|  [icon] Reasoning            [chevron]|
-+--------------------------------------+
-
-EXPANDED (after click):
-+--------------------------------------+
-|  [icon] Reasoning            [chevron]|
-|                                      |
-|  > Bullet 1 title + summary         |
-|  > Bullet 2 title + summary         |
-|  > Bullet 3 title + summary         |
-+--------------------------------------+
+Exact title match        +10
+Title starts with query   +6
+Alt phrasing match        +5   <-- NEW
+Title contains query      +4
+Keyword match             +3
+Layer-1 match             +1
 ```
 
-Each bullet inside still expands individually via the existing accordion to show its detail text. The two levels nest naturally: Collapsible controls visibility of the whole section, Accordion controls individual bullets.
-
-## What Does NOT Change
-- Database schema / `nodes` table
-- `layer2_json` structure
-- Layer 1 (always visible)
-- Layer 3 ("Next Steps")
-- Individual accordion bullet behavior
+### No other files change
+- Database schema stays the same
+- Search results page already displays results from the hook
+- No migration needed -- `alt_phrasings` already exists in the `nodes` table
