@@ -9,6 +9,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 interface ReasoningBullet {
   id: string;
@@ -147,42 +152,47 @@ const NodeDetail = () => {
         {/* ── Layer 2: Reasoning accordion ── */}
         {reasoning.length > 0 && (
           <section className="mb-10">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-md bg-amber-subtle flex items-center justify-center">
-                <BookOpen className="w-4 h-4 text-accent" />
-              </div>
-              <h2 className="font-display text-xl font-semibold text-foreground">
-                Reasoning
-              </h2>
-            </div>
+            <Collapsible>
+              <CollapsibleTrigger className="flex items-center gap-2 w-full group cursor-pointer">
+                <div className="w-8 h-8 rounded-md bg-amber-subtle flex items-center justify-center">
+                  <BookOpen className="w-4 h-4 text-accent" />
+                </div>
+                <h2 className="font-display text-xl font-semibold text-foreground flex-1 text-left">
+                  Reasoning
+                </h2>
+                <ChevronRight className="w-5 h-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" />
+              </CollapsibleTrigger>
 
-            <Accordion type="multiple" className="space-y-2">
-              {reasoning.map((bullet, i) => (
-                <AccordionItem
-                  key={bullet.id ?? i}
-                  value={bullet.id ?? `r-${i}`}
-                  className="surface-elevated rounded-lg border border-border px-5 data-[state=open]:glow-amber transition-shadow"
-                >
-                  <AccordionTrigger className="py-4 hover:no-underline gap-3">
-                    <div className="text-left flex-1 min-w-0">
-                      <h3 className="font-display text-sm font-semibold text-foreground leading-snug">
-                        {bullet.title}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground font-body line-clamp-2">
-                        {bullet.summary}
-                      </p>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-5">
-                    <div className="border-t border-border pt-4">
-                      <p className="text-sm text-foreground font-body leading-relaxed whitespace-pre-line">
-                        {bullet.detail}
-                      </p>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+              <CollapsibleContent className="mt-4">
+                <Accordion type="multiple" className="space-y-2">
+                  {reasoning.map((bullet, i) => (
+                    <AccordionItem
+                      key={bullet.id ?? i}
+                      value={bullet.id ?? `r-${i}`}
+                      className="surface-elevated rounded-lg border border-border px-5 data-[state=open]:glow-amber transition-shadow"
+                    >
+                      <AccordionTrigger className="py-4 hover:no-underline gap-3">
+                        <div className="text-left flex-1 min-w-0">
+                          <h3 className="font-display text-sm font-semibold text-foreground leading-snug">
+                            {bullet.title}
+                          </h3>
+                          <p className="mt-1 text-sm text-muted-foreground font-body line-clamp-2">
+                            {bullet.summary}
+                          </p>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-5">
+                        <div className="border-t border-border pt-4">
+                          <p className="text-sm text-foreground font-body leading-relaxed whitespace-pre-line">
+                            {bullet.detail}
+                          </p>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </CollapsibleContent>
+            </Collapsible>
           </section>
         )}
 
