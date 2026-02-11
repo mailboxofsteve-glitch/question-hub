@@ -85,18 +85,24 @@ Deno.serve(async (req) => {
       case "PUT": {
         if (!nodeId) return json({ error: "Node ID required" }, 400);
         const body = await req.json();
+        // Only include fields that are present in the request body
+        const updateData: Record<string, unknown> = {};
+        if ("title" in body) updateData.title = body.title;
+        if ("alt_phrasings" in body) updateData.alt_phrasings = body.alt_phrasings;
+        if ("category" in body) updateData.category = body.category;
+        if ("keywords" in body) updateData.keywords = body.keywords;
+        if ("layer1" in body) updateData.layer1 = body.layer1;
+        if ("layer2_json" in body) updateData.layer2_json = body.layer2_json;
+        if ("layer3_json" in body) updateData.layer3_json = body.layer3_json;
+        if ("published" in body) updateData.published = body.published;
+
+        if (Object.keys(updateData).length === 0) {
+          return json({ error: "No fields to update" }, 400);
+        }
+
         const { data, error } = await supabase
           .from("nodes")
-          .update({
-            title: body.title,
-            alt_phrasings: body.alt_phrasings,
-            category: body.category,
-            keywords: body.keywords,
-            layer1: body.layer1,
-            layer2_json: body.layer2_json,
-            layer3_json: body.layer3_json,
-            published: body.published,
-          })
+          .update(updateData)
           .eq("id", nodeId)
           .select()
           .single();
