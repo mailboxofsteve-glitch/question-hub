@@ -1,6 +1,7 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { trackEvent } from '@/lib/analytics';
 
 export interface NodeSearchResult {
   id: string;
@@ -70,6 +71,18 @@ export function useNodeSearch() {
     },
     enabled: query.trim().length > 0 || selectedCategory !== null,
   });
+
+  // Track search events (debounced — fires after 1s of no typing)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      trackEvent('search', null, { query: trimmed, result_count: searchResults.data?.length ?? 0 });
+    }, 1000);
+    return () => clearTimeout(searchTimerRef.current);
+  }, [query, searchResults.data?.length]);
 
   // Apply client-side relevance ranking
   const rankedResults = useMemo(() => {

@@ -1,7 +1,9 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { ArrowLeft, ChevronRight, BookOpen, Lightbulb, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { trackEvent } from '@/lib/analytics';
 import AppLayout from '@/components/layout/AppLayout';
 import {
   Accordion,
@@ -80,6 +82,15 @@ const NodeDetail = () => {
   const reasoning = layer2.reasoning ?? [];
   const resources = layer3.resources ?? [];
 
+  // Track view_node once per node load
+  const trackedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (node?.id && trackedRef.current !== node.id) {
+      trackedRef.current = node.id;
+      trackEvent('view_node', node.id);
+    }
+  }, [node?.id]);
+
   if (isLoading) {
     return (
       <AppLayout>
@@ -152,7 +163,7 @@ const NodeDetail = () => {
         {/* ── Layer 2: Reasoning accordion ── */}
         {reasoning.length > 0 && (
           <section className="mb-10">
-            <Collapsible>
+            <Collapsible onOpenChange={(open) => { if (open) trackEvent('expand_reasoning', node.id); }}>
               <CollapsibleTrigger className="flex items-center gap-2 w-full group cursor-pointer">
                 <div className="w-8 h-8 rounded-md bg-amber-subtle flex items-center justify-center">
                   <BookOpen className="w-4 h-4 text-accent" />
@@ -164,7 +175,10 @@ const NodeDetail = () => {
               </CollapsibleTrigger>
 
               <CollapsibleContent className="mt-4">
-                <Accordion type="multiple" className="space-y-2">
+                <Accordion type="multiple" className="space-y-2" onValueChange={(values) => {
+                  // Track each newly opened bullet
+                  values.forEach(v => trackEvent('expand_reasoning_bullet', node.id, { bullet_id: v }));
+                }}>
                   {reasoning.map((bullet, i) => (
                     <AccordionItem
                       key={bullet.id ?? i}
@@ -251,6 +265,7 @@ const NodeDetail = () => {
                     <Link
                       key={rn.id}
                       to={`/node/${rn.id}`}
+                      onClick={() => trackEvent('click_related', node.id, { target_node_id: rn.id })}
                       className="flex items-start justify-between gap-3 surface-elevated rounded-lg border border-border p-4 hover:border-accent/40 hover:glow-amber transition-all duration-200 group"
                     >
                       <div className="flex-1 min-w-0">
