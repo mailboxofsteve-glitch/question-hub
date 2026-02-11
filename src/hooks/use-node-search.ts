@@ -8,6 +8,7 @@ export interface NodeSearchResult {
   category: string | null;
   layer1: string | null;
   keywords: string | null;
+  alt_phrasings: string[] | null;
 }
 
 /**
@@ -27,11 +28,13 @@ function scoreResult(node: NodeSearchResult, term: string): number {
   const title = (node.title ?? '').toLowerCase();
   const keywords = (node.keywords ?? '').toLowerCase();
   const layer1 = (node.layer1 ?? '').toLowerCase();
+  const altText = (node.alt_phrasings ?? []).join(' ').toLowerCase();
 
   let score = 0;
   if (title === t) score += 10;
   else if (title.startsWith(t)) score += 6;
   else if (title.includes(t)) score += 4;
+  if (altText.includes(t)) score += 5;
   if (keywords.includes(t)) score += 3;
   if (layer1.includes(t)) score += 1;
   return score;
@@ -46,7 +49,7 @@ export function useNodeSearch() {
     queryFn: async () => {
       let q = supabase
         .from('nodes')
-        .select('id, title, category, layer1, keywords')
+        .select('id, title, category, layer1, keywords, alt_phrasings')
         .eq('published', true)
         .order('updated_at', { ascending: false });
 
@@ -56,7 +59,7 @@ export function useNodeSearch() {
 
       if (query.trim()) {
         const term = `%${query.trim()}%`;
-        q = q.or(`title.ilike.${term},keywords.ilike.${term},layer1.ilike.${term}`);
+        q = q.or(`title.ilike.${term},keywords.ilike.${term},layer1.ilike.${term},alt_phrasings::text.ilike.${term}`);
       }
 
       q = q.limit(50);
