@@ -15,6 +15,31 @@ interface NodeRow {
   search_blob: string | null;
 }
 
+function getMatchedFields(node: NodeRow, term: string): { matched_in: string[]; snippets: Record<string, string> } {
+  const t = term.toLowerCase();
+  const matched_in: string[] = [];
+  const snippets: Record<string, string> = {};
+
+  const fields: { name: string; value: string }[] = [
+    { name: "title", value: (node.title ?? "") },
+    { name: "keywords", value: (node.keywords ?? "") },
+    { name: "alt_phrasings", value: (Array.isArray(node.alt_phrasings) ? node.alt_phrasings : []).join(" ") },
+    { name: "layer1", value: (node.layer1 ?? "") },
+    { name: "search_blob", value: (node.search_blob ?? "") },
+  ];
+
+  for (const f of fields) {
+    const idx = f.value.toLowerCase().indexOf(t);
+    if (idx !== -1) {
+      matched_in.push(f.name);
+      const start = Math.max(0, idx - 30);
+      const end = Math.min(f.value.length, idx + t.length + 30);
+      snippets[f.name] = (start > 0 ? "…" : "") + f.value.slice(start, end) + (end < f.value.length ? "…" : "");
+    }
+  }
+  return { matched_in, snippets };
+}
+
 function scoreResult(node: NodeRow, term: string): number {
   if (!term) return 0;
   const t = term.toLowerCase();
@@ -55,7 +80,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const question = typeof body.question === "string" ? body.question.trim() : "";
     const maxResults = Math.min(Math.max(Number(body.max_results) || 20, 1), 50);
-
+    const debug = body.debug === true;
     if (!question) {
       return new Response(
         JSON.stringify({ query: "", results: [], meta: { took_ms: 0, count: 0 } }),
@@ -87,12 +112,20 @@ Deno.serve(async (req) => {
       .sort((a, b) => b.score - a.score)
       .slice(0, maxResults);
 
-    const results = scored.map((r) => ({
-      id: r.id,
-      title: r.title,
-      layer1: r.layer1 ?? "",
-      score: r.score,
-    }));
+    const results = scored.map((r) => {
+      const base: Record<string, unknown> = {
+        id: r.id,
+        title: r.title,
+        layer1: r.layer1 ?? "",
+        score: r.score,
+      };
+      if (debug) {
+        const { matched_in, snippets } = getMatchedFields(r, question);
+        base.matched_in = matched_in;
+        base.snippets = snippets;
+      }
+      return base;
+    });
 
     const tookMs = Date.now() - startMs;
 
