@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import NodeForm from './NodeForm';
 import { Plus, Pencil, Trash2, LogOut } from 'lucide-react';
 import ImportNodeDialog from './ImportNodeDialog';
+import ImportCsvDialog from './ImportCsvDialog';
 import type { ParsedNode } from '@/lib/parse-node-markdown';
 
 type Node = Tables<'nodes'>;
@@ -143,6 +144,13 @@ const AdminDashboard = ({ password, onLogout }: AdminDashboardProps) => {
                   published: parsed.published,
                   search_blob: parsed.search_blob,
                 });
+              }}
+            />
+            <ImportCsvDialog
+              onConfirm={async (rows) => {
+                for (const row of rows) {
+                  await handleCreate(row);
+                }
               }}
             />
             <Button onClick={() => setView('create')}>
