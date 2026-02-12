@@ -51,6 +51,7 @@ export type Database = {
           layer2_json: Json | null
           layer3_json: Json | null
           published: boolean
+          search_blob: string | null
           title: string
           updated_at: string
         }
@@ -63,6 +64,7 @@ export type Database = {
           layer2_json?: Json | null
           layer3_json?: Json | null
           published?: boolean
+          search_blob?: string | null
           title: string
           updated_at?: string
         }
@@ -75,6 +77,7 @@ export type Database = {
           layer2_json?: Json | null
           layer3_json?: Json | null
           published?: boolean
+          search_blob?: string | null
           title?: string
           updated_at?: string
         }

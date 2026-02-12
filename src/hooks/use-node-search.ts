@@ -10,6 +10,7 @@ export interface NodeSearchResult {
   layer1: string | null;
   keywords: string | null;
   alt_phrasings: string[] | null;
+  search_blob: string | null;
 }
 
 /**
@@ -37,6 +38,8 @@ function scoreResult(node: NodeSearchResult, term: string): number {
   else if (title.includes(t)) score += 4;
   if (altText.includes(t)) score += 5;
   if (keywords.includes(t)) score += 3;
+  const searchBlob = (node.search_blob ?? '').toLowerCase();
+  if (searchBlob.includes(t)) score += 2;
   if (layer1.includes(t)) score += 1;
   return score;
 }
@@ -50,7 +53,7 @@ export function useNodeSearch() {
     queryFn: async () => {
       let q = supabase
         .from('nodes')
-        .select('id, title, category, layer1, keywords, alt_phrasings')
+        .select('id, title, category, layer1, keywords, alt_phrasings, search_blob')
         .eq('published', true)
         .order('updated_at', { ascending: false });
 
@@ -60,7 +63,7 @@ export function useNodeSearch() {
 
       if (query.trim()) {
         const term = `%${query.trim()}%`;
-        q = q.or(`title.ilike.${term},keywords.ilike.${term},layer1.ilike.${term}`);
+        q = q.or(`title.ilike.${term},keywords.ilike.${term},layer1.ilike.${term},search_blob.ilike.${term}`);
       }
 
       q = q.limit(50);
