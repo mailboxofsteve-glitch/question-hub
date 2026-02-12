@@ -22,7 +22,7 @@ const Index = () => {
       <section className="container pt-24 pb-16 md:pt-32 md:pb-20">
         <div className="max-w-2xl mx-auto text-center">
           <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground leading-[1.1] animate-fade-up">
-            Find your <span className="text-gradient-amber">answer</span>
+            Faith<span className="text-gradient-amber">Examined</span>
           </h1>
           <p
             className="mt-4 text-muted-foreground font-body text-lg opacity-0 animate-fade-up"
