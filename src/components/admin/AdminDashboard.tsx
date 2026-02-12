@@ -10,6 +10,8 @@ import { Tables } from '@/integrations/supabase/types';
 import { toast } from '@/hooks/use-toast';
 import NodeForm from './NodeForm';
 import { Plus, Pencil, Trash2, LogOut } from 'lucide-react';
+import ImportNodeDialog from './ImportNodeDialog';
+import type { ParsedNode } from '@/lib/parse-node-markdown';
 
 type Node = Tables<'nodes'>;
 
@@ -127,6 +129,22 @@ const AdminDashboard = ({ password, onLogout }: AdminDashboardProps) => {
         <div className="flex items-center justify-between">
           <h1 className="font-display text-2xl font-semibold">Node Admin</h1>
           <div className="flex gap-2">
+            <ImportNodeDialog
+              onConfirm={(parsed: ParsedNode) => {
+                handleCreate({
+                  id: parsed.id,
+                  title: parsed.title,
+                  category: parsed.category,
+                  keywords: parsed.keywords,
+                  alt_phrasings: parsed.alt_phrasings as any,
+                  layer1: parsed.layer1,
+                  layer2_json: parsed.layer2_json as any,
+                  layer3_json: parsed.layer3_json as any,
+                  published: parsed.published,
+                  search_blob: parsed.search_blob,
+                });
+              }}
+            />
             <Button onClick={() => setView('create')}>
               <Plus className="w-4 h-4 mr-1" /> New Node
             </Button>
