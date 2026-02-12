@@ -22,13 +22,13 @@ const Index = () => {
       <section className="container pt-24 pb-16 md:pt-32 md:pb-20">
         <div className="max-w-2xl mx-auto text-center">
           <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground leading-[1.1] animate-fade-up">
-            Faith <span className="text-gradient-amber">Examined</span>
+            Find your <span className="text-gradient-amber">answer</span>
           </h1>
           <p
             className="mt-4 text-muted-foreground font-body text-lg opacity-0 animate-fade-up"
             style={{ animationDelay: "0.1s" }}
           >
-            Search across our knowledge base of connected questions.
+            "Examine yourselves as to whether you are in the faith. Test Yourselves. - 2 Cor. 13:5"
           </p>
 
           {/* Search bar */}
