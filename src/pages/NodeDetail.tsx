@@ -34,8 +34,15 @@ interface Resource {
   description?: string;
 }
 
+interface Source {
+  title: string;
+  url?: string;
+  description?: string;
+}
+
 interface Layer3 {
   resources?: Resource[];
+  sources?: Source[];
   related_questions?: string[];
   editorial_notes?: Record<string, string>;
 }
@@ -81,6 +88,7 @@ const NodeDetail = () => {
   const layer3 = (node?.layer3_json as Layer3) ?? {};
   const reasoning = layer2.reasoning ?? [];
   const resources = layer3.resources ?? [];
+  const sources = layer3.sources ?? [];
 
   // Track view_node once per node load
   const trackedRef = useRef<string | null>(null);
@@ -284,6 +292,49 @@ const NodeDetail = () => {
                 </div>
               </div>
             )}
+          </section>
+        )}
+
+        {/* ── Sources collapsible ── */}
+        {sources.length > 0 && (
+          <section className="mt-10">
+            <Collapsible>
+              <CollapsibleTrigger className="flex items-center gap-2 w-full group cursor-pointer">
+                <div className="w-8 h-8 rounded-md bg-amber-subtle flex items-center justify-center">
+                  <BookOpen className="w-4 h-4 text-accent" />
+                </div>
+                <h2 className="font-display text-xl font-semibold text-foreground flex-1 text-left">
+                  Sources
+                </h2>
+                <ChevronRight className="w-5 h-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" />
+              </CollapsibleTrigger>
+
+              <CollapsibleContent className="mt-4">
+                <div className="space-y-2">
+                  {sources.map((src, i) => (
+                    <a
+                      key={i}
+                      href={src.url ?? '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-start gap-3 surface-elevated rounded-lg border border-border p-4 hover:border-accent/40 hover:glow-amber transition-all duration-200 group"
+                    >
+                      <ExternalLink className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0 group-hover:text-accent transition-colors" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display">
+                          {src.title}
+                        </p>
+                        {src.description && (
+                          <p className="text-xs text-muted-foreground mt-0.5 font-body">
+                            {src.description}
+                          </p>
+                        )}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </section>
         )}
       </article>
