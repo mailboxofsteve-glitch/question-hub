@@ -148,6 +148,7 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
               placeholder='["How does gravity work?", "Why do things fall?"]'
               rows={3}
             />
+            <p className="text-xs text-muted-foreground">Must be a JSON array.</p>
             {errors.alt_phrasings && <p className="text-sm text-destructive">{errors.alt_phrasings}</p>}
           </div>
 
@@ -168,10 +169,11 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
               id="layer2_json"
               value={layer2Json}
               onChange={(e) => setLayer2Json(e.target.value)}
-              placeholder='{ "sections": [...] }'
+              placeholder='{ "reasoning": [{ "id": "...", "title": "...", "summary": "...", "detail": "..." }] }'
               rows={6}
               className="font-mono text-xs"
             />
+            <p className="text-xs text-muted-foreground">Must use <code className="font-mono">{"{ \"reasoning\": [...] }"}</code> format.</p>
             {errors.layer2_json && <p className="text-sm text-destructive">{errors.layer2_json}</p>}
           </div>
 
@@ -181,10 +183,11 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
               id="layer3_json"
               value={layer3Json}
               onChange={(e) => setLayer3Json(e.target.value)}
-              placeholder='{ "references": [...], "formulas": [...] }'
+              placeholder='{ "resources": [...], "sources": [...], "related_questions": [...] }'
               rows={6}
               className="font-mono text-xs"
             />
+            <p className="text-xs text-muted-foreground">Supports <code className="font-mono">{"{ \"resources\": [...], \"sources\": [...], \"related_questions\": [...] }"}</code>.</p>
             {errors.layer3_json && <p className="text-sm text-destructive">{errors.layer3_json}</p>}
           </div>
 
