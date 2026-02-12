@@ -7,25 +7,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-admin-password, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function buildSearchBlob(node: Record<string, unknown>): string {
-  const parts: string[] = [];
-  if (node.title) parts.push(String(node.title));
-  if (node.keywords) parts.push(String(node.keywords));
-  if (Array.isArray(node.alt_phrasings)) {
-    parts.push(node.alt_phrasings.join(" "));
-  }
-  if (node.layer1) parts.push(String(node.layer1));
-  const l2 = node.layer2_json as Record<string, unknown> | null | undefined;
-  if (l2 && Array.isArray(l2.reasoning)) {
-    for (const bullet of l2.reasoning) {
-      if (bullet && typeof bullet === "object" && "summary" in bullet) {
-        parts.push(String((bullet as Record<string, unknown>).summary));
-      }
-    }
-  }
-  return parts.filter(Boolean).join(" ");
-}
-
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -87,7 +68,7 @@ Deno.serve(async (req) => {
         if (!body.id || !body.title) {
           return json({ error: "id and title are required" }, 400);
         }
-        const nodeData = {
+        const { data, error } = await supabase.from("nodes").insert({
           id: body.id,
           title: body.title,
           alt_phrasings: body.alt_phrasings ?? [],
@@ -97,9 +78,7 @@ Deno.serve(async (req) => {
           layer2_json: body.layer2_json ?? {},
           layer3_json: body.layer3_json ?? {},
           published: body.published ?? false,
-        };
-        (nodeData as Record<string, unknown>).search_blob = buildSearchBlob(nodeData);
-        const { data, error } = await supabase.from("nodes").insert(nodeData).select().single();
+        }).select().single();
         if (error) return json({ error: error.message }, 400);
         return json(data, 201);
       }
@@ -120,16 +99,6 @@ Deno.serve(async (req) => {
 
         if (Object.keys(updateData).length === 0) {
           return json({ error: "No fields to update" }, 400);
-        }
-
-        // Rebuild search_blob from merged data
-        const blobFields = ["title", "keywords", "alt_phrasings", "layer1", "layer2_json"];
-        if (blobFields.some((f) => f in body)) {
-          const { data: existing, error: fetchErr } = await supabase
-            .from("nodes").select("*").eq("id", nodeId).single();
-          if (fetchErr) return json({ error: fetchErr.message }, 404);
-          const merged = { ...existing, ...updateData };
-          updateData.search_blob = buildSearchBlob(merged);
         }
 
         const { data, error } = await supabase

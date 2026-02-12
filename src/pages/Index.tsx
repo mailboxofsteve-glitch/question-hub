@@ -1,22 +1,19 @@
 import { Search, X, Stethoscope, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
-import { useAnswerSearch } from "@/hooks/use-answer-search";
 import { useNodeSearch } from "@/hooks/use-node-search";
 
 const Index = () => {
   const {
     query,
     setQuery,
+    selectedCategory,
+    setSelectedCategory,
     results,
     isSearching,
+    categories,
     clearSearch,
     hasActiveSearch,
-  } = useAnswerSearch();
-
-  const {
-    categories,
-    setSelectedCategory,
   } = useNodeSearch();
 
   return (
@@ -84,6 +81,11 @@ const Index = () => {
                       </h3>
                       {node.layer1 && (
                         <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2 font-body">{node.layer1}</p>
+                      )}
+                      {node.category && (
+                        <span className="inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-subtle text-accent-foreground">
+                          {node.category}
+                        </span>
                       )}
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground mt-1 shrink-0 group-hover:text-accent transition-colors" />
