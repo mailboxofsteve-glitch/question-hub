@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
       .select("id, title, layer1, keywords, alt_phrasings, search_blob")
       .eq("published", true)
       .or(
-        `title.ilike.${term},keywords.ilike.${term},layer1.ilike.${term},search_blob.ilike.${term}`
+        `search_blob.ilike.${term},title.ilike.${term}`
       )
       .order("updated_at", { ascending: false })
       .limit(50);
