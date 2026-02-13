@@ -1,5 +1,6 @@
 import { Search, X, Stethoscope, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useRef, useCallback } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useNodeSearch } from "@/hooks/use-node-search";
 
@@ -16,30 +17,43 @@ const Index = () => {
     hasActiveSearch,
   } = useNodeSearch();
 
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleSearchFocus = useCallback(() => {
+    setTimeout(() => {
+      searchContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
+  }, []);
+
   return (
     <AppLayout>
       {/* Hero + Search */}
-      <section className="container pt-24 pb-16 md:pt-32 md:pb-20">
+      <section className={`container pb-16 md:pb-20 transition-all duration-300 ${hasActiveSearch ? 'pt-6 md:pt-10' : 'pt-24 md:pt-32'}`}>
         <div className="max-w-2xl mx-auto text-center">
-          <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground leading-[1.1] animate-fade-up">
-            Faith<span className="text-gradient-amber">Examined</span>
-          </h1>
-          <p
-            className="mt-4 text-muted-foreground font-body text-lg opacity-0 animate-fade-up"
-            style={{ animationDelay: "0.1s" }}
-          >
-            "Examine yourselves as to whether you are in the faith. Test Yourselves."
-            <br /> (2 Corinthians 13:5)
-          </p>
+          {!hasActiveSearch && (
+            <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground leading-[1.1] animate-fade-up">
+              Faith<span className="text-gradient-amber">Examined</span>
+            </h1>
+          )}
+          {!hasActiveSearch && (
+            <p
+              className="mt-4 text-muted-foreground font-body text-lg opacity-0 animate-fade-up"
+              style={{ animationDelay: "0.1s" }}
+            >
+              "Examine yourselves as to whether you are in the faith. Test Yourselves."
+              <br /> (2 Corinthians 13:5)
+            </p>
+          )}
 
           {/* Search bar */}
-          <div className="mt-8 relative opacity-0 animate-fade-up" style={{ animationDelay: "0.2s" }}>
+          <div ref={searchContainerRef} className="mt-8 relative opacity-0 animate-fade-up" style={{ animationDelay: "0.2s" }}>
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onFocus={handleSearchFocus}
                 placeholder="Search questions, keywords, topics…"
                 className="w-full h-14 pl-12 pr-12 rounded-xl border border-border bg-background text-foreground font-body text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-shadow"
               />

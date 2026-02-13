@@ -198,7 +198,7 @@ const NodeDetail = () => {
                           <h3 className="font-display text-sm font-semibold text-foreground leading-snug">
                             {bullet.title}
                           </h3>
-                          <p className="mt-1 text-sm text-muted-foreground font-body line-clamp-2">
+                          <p className="mt-1 text-sm text-muted-foreground font-body">
                             {bullet.summary}
                           </p>
                         </div>
