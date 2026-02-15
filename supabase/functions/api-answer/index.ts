@@ -163,8 +163,10 @@ Deno.serve(async (req) => {
   try {
     const { query, category, limit = 10 } = await req.json();
 
-    if (!query || typeof query !== "string" || !query.trim()) {
-      return json({ error: "query is required" }, 400);
+    const hasQuery = query && typeof query === "string" && query.trim().length > 0;
+
+    if (!hasQuery && !category) {
+      return json({ error: "query or category is required" }, 400);
     }
 
     const supabase = createClient(
@@ -183,10 +185,15 @@ Deno.serve(async (req) => {
       q = q.eq("category", category);
     }
 
-    const term = `%${query.trim()}%`;
-    q = q.or(
-      `title.ilike.${term},keywords.ilike.${term},layer1.ilike.${term},search_blob.ilike.${term}`
-    );
+    const trimmedQuery = hasQuery ? query.trim() : "";
+
+    if (trimmedQuery) {
+      const term = `%${trimmedQuery}%`;
+      q = q.or(
+        `title.ilike.${term},keywords.ilike.${term},layer1.ilike.${term},search_blob.ilike.${term}`
+      );
+    }
+
     q = q.limit(50);
 
     const { data: rawNodes, error } = await q;
@@ -196,7 +203,7 @@ Deno.serve(async (req) => {
 
     // Rank and take top N
     const ranked = (rawNodes as NodeRow[])
-      .map((n) => ({ ...n, _score: scoreNode(n, query.trim()) }))
+      .map((n) => ({ ...n, _score: trimmedQuery ? scoreNode(n, trimmedQuery) : 0 }))
       .sort((a, b) => b._score - a._score)
       .slice(0, Math.min(limit, 50));
 
@@ -207,8 +214,8 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     let llmResult: LlmResult | null = null;
 
-    if (apiKey && responseNodes.length > 0) {
-      llmResult = await callLlm(query.trim(), responseNodes, apiKey);
+    if (apiKey && responseNodes.length > 0 && trimmedQuery) {
+      llmResult = await callLlm(trimmedQuery, responseNodes, apiKey);
     }
 
     // Merge LLM relevance into nodes
@@ -221,7 +228,7 @@ Deno.serve(async (req) => {
     });
 
     return json({
-      query: query.trim(),
+      query: trimmedQuery,
       nodes: nodesWithRelevance,
       summary: llmResult?.summary ?? null,
     });
