@@ -2,3 +2,6 @@ project_id = "vrofgmxsengdzdofdljx"
 
 [functions.admin-nodes]
 verify_jwt = false
+
+[functions.api-answer]
+verify_jwt = false
