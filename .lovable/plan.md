@@ -1,76 +1,92 @@
 
 
-## Fix: Search Not Finding Alt Phrasings
+## Scalable Semantic Search with Vector Embeddings
 
-### Problem
+### Why Change the Approach
 
-When you search "Is there a God?", zero results appear even though `node-001-does-god-exist` has that exact phrase as an alternative phrasing. This happens because:
+The previously approved plan sends ALL published nodes to the LLM when keyword search falls short. This works at 15 nodes but breaks down as the catalog grows:
 
-1. The `search_blob` field for this node is **empty** (`null`). The admin form never populates it.
-2. `alt_phrasings` is stored as a JSON array, which the database text search (`ilike`) cannot match against.
-3. The CSV and Markdown importers correctly build `search_blob` from title + layer1 + keywords + alt phrasings, but the admin API does not.
+| Catalog size | Full-catalog LLM call | Vector search |
+|---|---|---|
+| 15 nodes | Fine | Overkill |
+| 100 nodes | Borderline (slow, costly) | Fast |
+| 500+ nodes | Fails (context limits) | Fast |
+| 10,000 nodes | Impossible | Still fast |
 
-### Solution
+### How It Works
 
-Auto-generate `search_blob` in the **admin-nodes** backend function whenever a node is created or updated. This is a single change to one file.
-
----
-
-### Changes
-
-**File: `supabase/functions/admin-nodes/index.ts`**
-
-Add a helper function that builds `search_blob` from the node fields (same logic used by the CSV/Markdown parsers):
-
-```
-function buildSearchBlob(data): string {
-  return [title, layer1, keywords, altPhrasings.join(' ')]
-    .filter(Boolean).join(' ')
-}
-```
-
-Then call it in both the **POST** (create) and **PUT** (update) handlers so that `search_blob` is always written alongside the other fields.
-
-For **PUT** (update), since only changed fields are sent, the function will first fetch the existing node, merge in the updates, then rebuild `search_blob` from the merged data.
-
-**File: `supabase/functions/api-answer/index.ts`**
-
-No changes needed -- the search query already filters on `search_blob.ilike`, and the `scoreNode` function already scores `alt_phrasings` text. Once `search_blob` is populated, both will work correctly.
-
----
-
-### What this fixes
-
-- All nodes created or edited via the admin panel will have a complete `search_blob`
-- Searching "Is there a God?" will match `node-001-does-god-exist` because `search_blob` will contain that phrase
-- Existing nodes with `null` search_blob will be fixed the next time they are saved through the admin panel
-
-### Backfill existing nodes
-
-After deploying, a one-time SQL update can backfill `search_blob` for all existing nodes that have it as `null`. This will be run as a database migration:
-
-```sql
-UPDATE nodes
-SET search_blob = CONCAT_WS(' ',
-  title,
-  layer1,
-  keywords,
-  ARRAY_TO_STRING(
-    ARRAY(SELECT jsonb_array_elements_text(COALESCE(alt_phrasings, '[]'::jsonb))),
-    ' '
-  )
-)
-WHERE search_blob IS NULL;
+```text
+User query: "Why do bad things happen?"
+        |
+        v
+  [1] Convert query to embedding vector (one LLM call, cheap)
+        |
+        v
+  [2] Database finds 5 closest nodes by vector similarity (milliseconds, no LLM)
+        |
+        v
+  [3] Merge with keyword results (union of both sets, deduplicated)
+        |
+        v
+  [4] Send top 5 nodes to LLM for explanation text (same as current flow)
+        |
+        v
+  Response: { nodes: [{ id, title, layer1, explanation }], query_echo }
 ```
 
----
+### Implementation Plan
 
-### Summary of files changed
+**Step 1: Enable pgvector and add embedding column**
+
+Database migration to:
+- Enable the `vector` extension
+- Add an `embedding` column (`vector(768)`) to the `nodes` table
+- Create an index for fast similarity search (HNSW)
+- Create a database function `match_nodes` that performs cosine similarity search
+
+**Step 2: Create `generate-embeddings` backend function**
+
+A new backend function that:
+- Takes a node ID (or "all" to batch-process)
+- Reads the node's title, layer1, keywords, and alt_phrasings
+- Calls the embedding model to generate a vector
+- Stores the vector in the `embedding` column
+- Called automatically when nodes are created/updated via admin, and can be triggered manually for batch backfill
+
+**Step 3: Update `api-answer` to use vector search as fallback**
+
+Modified search flow:
+1. Run keyword `ilike` search (unchanged)
+2. If fewer than 3 keyword results, run vector similarity search instead of fetching all nodes
+3. Merge and deduplicate results from both passes
+4. Send top 5 to LLM for explanation (unchanged)
+
+This replaces the "send all nodes to LLM" fallback with a database query that returns in milliseconds regardless of catalog size.
+
+**Step 4: Update `admin-nodes` to trigger embedding generation**
+
+When a node is created or updated, call the `generate-embeddings` function to keep the embedding in sync (similar to how `search_blob` is rebuilt on save).
+
+### Files Changed
 
 | File | Change |
-|------|--------|
-| `supabase/functions/admin-nodes/index.ts` | Add `buildSearchBlob` helper; use it in POST and PUT |
-| Database migration | Backfill `search_blob` for existing nodes |
+|---|---|
+| New migration SQL | Enable pgvector, add `embedding` column, create `match_nodes` function |
+| `supabase/functions/generate-embeddings/index.ts` | New function: generates and stores embeddings |
+| `supabase/functions/api-answer/index.ts` | Replace full-catalog LLM fallback with vector similarity query |
+| `supabase/functions/admin-nodes/index.ts` | Trigger embedding generation on create/update |
 
-No frontend changes needed.
+### What Stays the Same
+
+- Response contract: `{ nodes: [{ id, title, layer1, explanation }], query_echo }` -- no frontend changes
+- Keyword search (Pass 1) -- still runs first, still useful for exact matches
+- LLM explanation step -- still generates per-node explanations for the final top 5
+- All AI logic stays server-side
+
+### Scaling Profile
+
+- Embedding generation: one-time cost per node (runs on save)
+- Query time: ~50ms for vector search regardless of catalog size
+- LLM cost per query: unchanged (always 5 nodes max)
+- Storage: ~3KB per node for the embedding vector
 
