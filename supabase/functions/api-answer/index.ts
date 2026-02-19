@@ -14,7 +14,7 @@ function json(data: unknown, status = 200) {
   });
 }
 
-/* ── Relevance scoring (mirrors client-side algorithm) ── */
+/* ── Types ── */
 
 interface NodeRow {
   id: string;
@@ -25,6 +25,19 @@ interface NodeRow {
   alt_phrasings: string[] | null;
   search_blob: string | null;
 }
+
+interface ResponseNode {
+  id: string;
+  title: string;
+  layer1: string | null;
+  explanation: string | null;
+}
+
+interface LlmResult {
+  nodes: { id: string; explanation: string }[];
+}
+
+/* ── Relevance scoring ── */
 
 function scoreNode(node: NodeRow, term: string): number {
   const t = term.toLowerCase();
@@ -45,12 +58,7 @@ function scoreNode(node: NodeRow, term: string): number {
   return score;
 }
 
-/* ── LLM call via Lovable AI Gateway ── */
-
-interface LlmResult {
-  summary: string;
-  nodes: { id: string; relevance: string }[];
-}
+/* ── LLM call ── */
 
 async function callLlm(
   query: string,
@@ -61,7 +69,7 @@ async function callLlm(
     const nodeDescriptions = nodes
       .map(
         (n, i) =>
-          `[${i + 1}] id="${n.id}" title="${n.title}"${n.layer1 ? ` summary="${n.layer1}"` : ""}${n.keywords ? ` keywords="${n.keywords}"` : ""}`
+          `[${i + 1}] id="${n.id}" title="${n.title}"${n.layer1 ? ` layer1="${n.layer1}"` : ""}`
       )
       .join("\n");
 
@@ -71,32 +79,27 @@ async function callLlm(
         function: {
           name: "navigation_response",
           description:
-            "Return the navigation assistant response with per-node relevance and an overall summary.",
+            "Return per-node relevance explanations.",
           parameters: {
             type: "object",
             properties: {
-              summary: {
-                type: "string",
-                description:
-                  "A 1-3 sentence summary explaining how the found content relates to the user query. Must ONLY reference provided node content.",
-              },
               nodes: {
                 type: "array",
                 items: {
                   type: "object",
                   properties: {
                     id: { type: "string", description: "The node id." },
-                    relevance: {
+                    explanation: {
                       type: "string",
                       description:
-                        "1-2 sentence explanation of why this node is relevant. Must ONLY summarize provided content.",
+                        "1-2 sentence explanation of why this node is relevant.",
                     },
                   },
-                  required: ["id", "relevance"],
+                  required: ["id", "explanation"],
                 },
               },
             },
-            required: ["summary", "nodes"],
+            required: ["nodes"],
           },
         },
       },
@@ -111,11 +114,12 @@ async function callLlm(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-3-flash-preview",
           messages: [
             {
               role: "system",
-              content: `You are a navigation assistant for a faith-based Q&A knowledge base. Given a user's question and a set of existing content nodes, explain why each node is relevant. You may ONLY summarize or reference information that appears in the provided node content. Do not generate new claims, arguments, theological positions, or information of any kind. Always call the navigation_response tool.`,
+              content:
+                "You are a navigation assistant. Using only the node content provided, write 1-2 sentences explaining why each node is relevant to the user's question. Do not add claims, arguments, or information not present in the node text.",
             },
             {
               role: "user",
@@ -141,8 +145,7 @@ async function callLlm(
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) return null;
 
-    const parsed = JSON.parse(toolCall.function.arguments);
-    return parsed as LlmResult;
+    return JSON.parse(toolCall.function.arguments) as LlmResult;
   } catch (err) {
     console.error("LLM call failed:", err);
     return null;
@@ -161,9 +164,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { query, category, limit = 10 } = await req.json();
+    const { query, category, limit = 5 } = await req.json();
 
-    const hasQuery = query && typeof query === "string" && query.trim().length > 0;
+    const hasQuery =
+      query && typeof query === "string" && query.trim().length > 0;
 
     if (!hasQuery && !category) {
       return json({ error: "query or category is required" }, 400);
@@ -174,10 +178,11 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Search nodes
     let q = supabase
       .from("nodes")
-      .select("id, title, category, layer1, keywords, alt_phrasings, search_blob")
+      .select(
+        "id, title, category, layer1, keywords, alt_phrasings, search_blob"
+      )
       .eq("published", true)
       .order("updated_at", { ascending: false });
 
@@ -201,36 +206,44 @@ Deno.serve(async (req) => {
       return json({ error: error.message }, 500);
     }
 
+    // Zero results → skip LLM
+    if (!rawNodes || rawNodes.length === 0) {
+      return json({
+        nodes: [],
+        query_echo: trimmedQuery,
+        message:
+          "No results found. Try rephrasing your question or using different keywords.",
+      });
+    }
+
     // Rank and take top N
     const ranked = (rawNodes as NodeRow[])
-      .map((n) => ({ ...n, _score: trimmedQuery ? scoreNode(n, trimmedQuery) : 0 }))
+      .map((n) => ({
+        ...n,
+        _score: trimmedQuery ? scoreNode(n, trimmedQuery) : 0,
+      }))
       .sort((a, b) => b._score - a._score)
       .slice(0, Math.min(limit, 50));
 
-    // Prepare clean nodes for response
-    const responseNodes = ranked.map(({ _score, ...rest }) => rest);
-
-    // Call LLM for relevance explanations (graceful degradation)
+    // LLM enrichment (graceful degradation)
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     let llmResult: LlmResult | null = null;
 
-    if (apiKey && responseNodes.length > 0 && trimmedQuery) {
-      llmResult = await callLlm(trimmedQuery, responseNodes, apiKey);
+    if (apiKey && trimmedQuery && ranked.length > 0) {
+      llmResult = await callLlm(trimmedQuery, ranked, apiKey);
     }
 
-    // Merge LLM relevance into nodes
-    const nodesWithRelevance = responseNodes.map((node) => {
-      const llmNode = llmResult?.nodes?.find((n) => n.id === node.id);
-      return {
-        ...node,
-        relevance: llmNode?.relevance ?? null,
-      };
-    });
+    // Build slim response nodes
+    const responseNodes: ResponseNode[] = ranked.map(
+      ({ id, title, layer1 }) => {
+        const llmNode = llmResult?.nodes?.find((n) => n.id === id);
+        return { id, title, layer1, explanation: llmNode?.explanation ?? null };
+      }
+    );
 
     return json({
-      query: trimmedQuery,
-      nodes: nodesWithRelevance,
-      summary: llmResult?.summary ?? null,
+      nodes: responseNodes,
+      query_echo: trimmedQuery,
     });
   } catch (err) {
     console.error("api-answer error:", err);
