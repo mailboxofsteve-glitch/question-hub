@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,6 +7,9 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tables } from '@/integrations/supabase/types';
 import { ArrowLeft } from 'lucide-react';
+import AltPhrasingsField from './AltPhrasingsField';
+import Layer2Field, { ReasoningBullet, serializeLayer2, deserializeLayer2 } from './Layer2Field';
+import Layer3Field, { Layer3Data, serializeLayer3, deserializeLayer3 } from './Layer3Field';
 
 type Node = Tables<'nodes'>;
 
@@ -17,19 +20,15 @@ interface NodeFormProps {
   loading?: boolean;
 }
 
-function safeJsonStringify(val: unknown): string {
-  if (!val) return '';
-  if (typeof val === 'string') return val;
-  return JSON.stringify(val, null, 2);
-}
-
-function safeJsonParse(val: string): unknown {
-  if (!val.trim()) return null;
-  try {
-    return JSON.parse(val);
-  } catch {
-    return null;
+function parseAltPhrasings(val: unknown): string[] {
+  if (Array.isArray(val)) return val.map(String);
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {}
   }
+  return [];
 }
 
 const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
@@ -37,17 +36,17 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
 
   const [id, setId] = useState(node?.id ?? '');
   const [title, setTitle] = useState(node?.title ?? '');
-  const [altPhrasings, setAltPhrasings] = useState(
-    safeJsonStringify(node?.alt_phrasings ?? [])
+  const [altPhrasings, setAltPhrasings] = useState<string[]>(
+    parseAltPhrasings(node?.alt_phrasings)
   );
   const [category, setCategory] = useState(node?.category ?? '');
   const [keywords, setKeywords] = useState(node?.keywords ?? '');
   const [layer1, setLayer1] = useState(node?.layer1 ?? '');
-  const [layer2Json, setLayer2Json] = useState(
-    safeJsonStringify(node?.layer2_json ?? {})
+  const [layer2Bullets, setLayer2Bullets] = useState<ReasoningBullet[]>(
+    deserializeLayer2(node?.layer2_json)
   );
-  const [layer3Json, setLayer3Json] = useState(
-    safeJsonStringify(node?.layer3_json ?? {})
+  const [layer3Data, setLayer3Data] = useState<Layer3Data>(
+    deserializeLayer3(node?.layer3_json)
   );
   const [published, setPublished] = useState(node?.published ?? false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -57,9 +56,6 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
     if (!id.trim()) errs.id = 'ID is required';
     else if (!/^[a-z0-9-]+$/.test(id)) errs.id = 'Use lowercase letters, numbers, and hyphens only';
     if (!title.trim()) errs.title = 'Title is required';
-    if (altPhrasings.trim() && !safeJsonParse(altPhrasings)) errs.alt_phrasings = 'Invalid JSON';
-    if (layer2Json.trim() && !safeJsonParse(layer2Json)) errs.layer2_json = 'Invalid JSON';
-    if (layer3Json.trim() && !safeJsonParse(layer3Json)) errs.layer3_json = 'Invalid JSON';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -70,12 +66,12 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
     await onSubmit({
       id: id.trim(),
       title: title.trim(),
-      alt_phrasings: (safeJsonParse(altPhrasings) ?? []) as Node['alt_phrasings'],
+      alt_phrasings: altPhrasings.filter((p) => p.trim()) as unknown as Node['alt_phrasings'],
       category: category.trim() || null,
       keywords: keywords.trim() || null,
       layer1: layer1.trim() || null,
-      layer2_json: (safeJsonParse(layer2Json) ?? {}) as Node['layer2_json'],
-      layer3_json: (safeJsonParse(layer3Json) ?? {}) as Node['layer3_json'],
+      layer2_json: serializeLayer2(layer2Bullets) as unknown as Node['layer2_json'],
+      layer3_json: serializeLayer3(layer3Data) as unknown as Node['layer3_json'],
       published,
     });
   };
@@ -139,18 +135,7 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="alt_phrasings">Alt Phrasings (JSON array)</Label>
-            <Textarea
-              id="alt_phrasings"
-              value={altPhrasings}
-              onChange={(e) => setAltPhrasings(e.target.value)}
-              placeholder='["How does gravity work?", "Why do things fall?"]'
-              rows={3}
-            />
-            <p className="text-xs text-muted-foreground">Must be a JSON array.</p>
-            {errors.alt_phrasings && <p className="text-sm text-destructive">{errors.alt_phrasings}</p>}
-          </div>
+          <AltPhrasingsField phrasings={altPhrasings} onChange={setAltPhrasings} />
 
           <div className="space-y-2">
             <Label htmlFor="layer1">Layer 1 — Summary</Label>
@@ -163,33 +148,9 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="layer2_json">Layer 2 — Structured Detail (JSON)</Label>
-            <Textarea
-              id="layer2_json"
-              value={layer2Json}
-              onChange={(e) => setLayer2Json(e.target.value)}
-              placeholder='{ "reasoning": [{ "id": "...", "title": "...", "summary": "...", "detail": "..." }] }'
-              rows={6}
-              className="font-mono text-xs"
-            />
-            <p className="text-xs text-muted-foreground">Must use <code className="font-mono">{"{ \"reasoning\": [...] }"}</code> format.</p>
-            {errors.layer2_json && <p className="text-sm text-destructive">{errors.layer2_json}</p>}
-          </div>
+          <Layer2Field bullets={layer2Bullets} onChange={setLayer2Bullets} />
 
-          <div className="space-y-2">
-            <Label htmlFor="layer3_json">Layer 3 — Expert/Technical (JSON)</Label>
-            <Textarea
-              id="layer3_json"
-              value={layer3Json}
-              onChange={(e) => setLayer3Json(e.target.value)}
-              placeholder='{ "resources": [...], "sources": [...], "related_questions": [...] }'
-              rows={6}
-              className="font-mono text-xs"
-            />
-            <p className="text-xs text-muted-foreground">Supports <code className="font-mono">{"{ \"resources\": [...], \"sources\": [...], \"related_questions\": [...] }"}</code>.</p>
-            {errors.layer3_json && <p className="text-sm text-destructive">{errors.layer3_json}</p>}
-          </div>
+          <Layer3Field data={layer3Data} onChange={setLayer3Data} />
 
           <div className="flex items-center gap-3 pt-2">
             <Switch id="published" checked={published} onCheckedChange={setPublished} />
