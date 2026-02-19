@@ -18,6 +18,16 @@ function unauthorized() {
   return json({ error: "Unauthorized" }, 401);
 }
 
+function buildSearchBlob(data: Record<string, unknown>): string {
+  const title = (data.title as string) ?? "";
+  const layer1 = (data.layer1 as string) ?? "";
+  const keywords = (data.keywords as string) ?? "";
+  const altPhrasings = Array.isArray(data.alt_phrasings)
+    ? (data.alt_phrasings as string[]).join(" ")
+    : "";
+  return [title, layer1, keywords, altPhrasings].filter(Boolean).join(" ");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -68,7 +78,7 @@ Deno.serve(async (req) => {
         if (!body.id || !body.title) {
           return json({ error: "id and title are required" }, 400);
         }
-        const { data, error } = await supabase.from("nodes").insert({
+        const insertData = {
           id: body.id,
           title: body.title,
           alt_phrasings: body.alt_phrasings ?? [],
@@ -78,7 +88,10 @@ Deno.serve(async (req) => {
           layer2_json: body.layer2_json ?? {},
           layer3_json: body.layer3_json ?? {},
           published: body.published ?? false,
-        }).select().single();
+          search_blob: "",
+        };
+        insertData.search_blob = buildSearchBlob(insertData);
+        const { data, error } = await supabase.from("nodes").insert(insertData).select().single();
         if (error) return json({ error: error.message }, 400);
         return json(data, 201);
       }
@@ -100,6 +113,17 @@ Deno.serve(async (req) => {
         if (Object.keys(updateData).length === 0) {
           return json({ error: "No fields to update" }, 400);
         }
+
+        // Fetch existing node to merge for search_blob rebuild
+        const { data: existing, error: fetchErr } = await supabase
+          .from("nodes")
+          .select("title, layer1, keywords, alt_phrasings")
+          .eq("id", nodeId)
+          .single();
+        if (fetchErr) return json({ error: fetchErr.message }, 400);
+
+        const merged = { ...existing, ...updateData };
+        updateData.search_blob = buildSearchBlob(merged);
 
         const { data, error } = await supabase
           .from("nodes")
