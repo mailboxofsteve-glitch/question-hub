@@ -1,38 +1,76 @@
 
 
-## Upgrade `/api-answer` to Navigation Assistant Spec
+## Fix: Search Not Finding Alt Phrasings
 
-The existing edge function already has the search + LLM pipeline. This upgrade aligns it precisely with the requested contract.
+### Problem
+
+When you search "Is there a God?", zero results appear even though `node-001-does-god-exist` has that exact phrase as an alternative phrasing. This happens because:
+
+1. The `search_blob` field for this node is **empty** (`null`). The admin form never populates it.
+2. `alt_phrasings` is stored as a JSON array, which the database text search (`ilike`) cannot match against.
+3. The CSV and Markdown importers correctly build `search_blob` from title + layer1 + keywords + alt phrasings, but the admin API does not.
+
+### Solution
+
+Auto-generate `search_blob` in the **admin-nodes** backend function whenever a node is created or updated. This is a single change to one file.
 
 ---
 
 ### Changes
 
-**1. `supabase/functions/api-answer/index.ts`** -- Update edge function
+**File: `supabase/functions/admin-nodes/index.ts`**
 
-- Change default `limit` from 10 to 5 (top 3-5 nodes for LLM context)
-- Rename `relevance` to `explanation` in the tool-calling schema and LLM result interface
-- Rename response field `query` to `query_echo`
-- Remove the `summary` field from the response (not in spec)
-- Update the model to `google/gemini-3-flash-preview`
-- When search returns zero results, skip the LLM call and return: `{ nodes: [], query_echo: "...", message: "No results found. Try rephrasing your question or using different keywords." }`
-- Tighten the system prompt to match the spec exactly: "You are a navigation assistant. Using only the node content provided, write 1-2 sentences explaining why each node is relevant to the user's question. Do not add claims, arguments, or information not present in the node text."
-- Remove `search_blob`, `keywords`, `alt_phrasings`, and `category` from the response nodes -- only return `id`, `title`, `layer1`, `explanation`
+Add a helper function that builds `search_blob` from the node fields (same logic used by the CSV/Markdown parsers):
 
-**2. `src/hooks/use-node-search.ts`** -- Update hook types and mapping
+```
+function buildSearchBlob(data): string {
+  return [title, layer1, keywords, altPhrasings.join(' ')]
+    .filter(Boolean).join(' ')
+}
+```
 
-- Update `SearchResponse` interface to match new shape: `{ nodes: [{ id, title, layer1, explanation }], query_echo, message? }`
-- Update `NodeSearchResult` to include `explanation` instead of `relevance`
-- Map the response correctly for the UI (keep `category` available from the node data for display by re-querying if needed, or accept it won't be in the API response)
+Then call it in both the **POST** (create) and **PUT** (update) handlers so that `search_blob` is always written alongside the other fields.
 
-**3. No UI changes** -- Index.tsx and SearchResults.tsx already consume `results` from the hook and display `node.title`, `node.layer1`, and `node.category`. Since `category` will no longer be in the API response, the category badge won't render in search results (acceptable -- the data is still on the node detail page). The `explanation` field will be available for future UI display.
+For **PUT** (update), since only changed fields are sent, the function will first fetch the existing node, merge in the updates, then rebuild `search_blob` from the merged data.
+
+**File: `supabase/functions/api-answer/index.ts`**
+
+No changes needed -- the search query already filters on `search_blob.ilike`, and the `scoreNode` function already scores `alt_phrasings` text. Once `search_blob` is populated, both will work correctly.
 
 ---
 
-### Technical details
+### What this fixes
 
-- The edge function still supports `category` as a filter parameter -- it just won't return category in the response nodes
-- LLM graceful degradation remains: if the LLM call fails, nodes are returned without `explanation`
-- The hook continues to send `limit: 50` for category-only browsing but the edge function caps LLM context at 5 nodes
-- CORS headers unchanged
-- All AI logic stays server-side per architecture rules
+- All nodes created or edited via the admin panel will have a complete `search_blob`
+- Searching "Is there a God?" will match `node-001-does-god-exist` because `search_blob` will contain that phrase
+- Existing nodes with `null` search_blob will be fixed the next time they are saved through the admin panel
+
+### Backfill existing nodes
+
+After deploying, a one-time SQL update can backfill `search_blob` for all existing nodes that have it as `null`. This will be run as a database migration:
+
+```sql
+UPDATE nodes
+SET search_blob = CONCAT_WS(' ',
+  title,
+  layer1,
+  keywords,
+  ARRAY_TO_STRING(
+    ARRAY(SELECT jsonb_array_elements_text(COALESCE(alt_phrasings, '[]'::jsonb))),
+    ' '
+  )
+)
+WHERE search_blob IS NULL;
+```
+
+---
+
+### Summary of files changed
+
+| File | Change |
+|------|--------|
+| `supabase/functions/admin-nodes/index.ts` | Add `buildSearchBlob` helper; use it in POST and PUT |
+| Database migration | Backfill `search_blob` for existing nodes |
+
+No frontend changes needed.
+
