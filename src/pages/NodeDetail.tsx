@@ -242,13 +242,9 @@ const NodeDetail = () => {
                     >
                       <ExternalLink className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0 group-hover:text-accent transition-colors" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display">
-                          {res.title}
-                        </p>
+                        <MarkdownText content={res.title} className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display" />
                         {res.description && (
-                          <p className="text-xs text-muted-foreground mt-0.5 font-body">
-                            {res.description}
-                          </p>
+                          <MarkdownText content={res.description} className="text-xs text-muted-foreground mt-0.5 font-body" />
                         )}
                       </div>
                     </a>
@@ -316,13 +312,9 @@ const NodeDetail = () => {
                     >
                       <ExternalLink className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0 group-hover:text-accent transition-colors" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display">
-                          {src.title}
-                        </p>
+                        <MarkdownText content={src.title} className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display" />
                         {src.description && (
-                          <p className="text-xs text-muted-foreground mt-0.5 font-body">
-                            {src.description}
-                          </p>
+                          <MarkdownText content={src.description} className="text-xs text-muted-foreground mt-0.5 font-body" />
                         )}
                       </div>
                     </a>
