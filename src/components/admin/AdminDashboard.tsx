@@ -12,6 +12,7 @@ import NodeForm from './NodeForm';
 import { Plus, Pencil, Trash2, LogOut } from 'lucide-react';
 import ImportNodeDialog from './ImportNodeDialog';
 import ImportCsvDialog from './ImportCsvDialog';
+import WriterGuideDialog from './WriterGuideDialog';
 import type { ParsedNode } from '@/lib/parse-node-markdown';
 
 type Node = Tables<'nodes'>;
@@ -153,6 +154,7 @@ const AdminDashboard = ({ password, onLogout }: AdminDashboardProps) => {
                 }
               }}
             />
+            <WriterGuideDialog />
             <Button onClick={() => setView('create')}>
               <Plus className="w-4 h-4 mr-1" /> New Node
             </Button>
