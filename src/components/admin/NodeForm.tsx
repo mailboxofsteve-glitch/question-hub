@@ -146,6 +146,7 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
               placeholder="A concise answer in 2-3 sentences…"
               rows={4}
             />
+            <p className="text-xs text-muted-foreground">Use *italic* or **bold** for formatting.</p>
           </div>
 
           <Layer2Field bullets={layer2Bullets} onChange={setLayer2Bullets} />
