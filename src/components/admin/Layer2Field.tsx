@@ -87,6 +87,7 @@ const Layer2Field = ({ bullets, onChange, errors }: Layer2FieldProps) => {
               placeholder="1–2 sentence summary"
               rows={2}
             />
+            <p className="text-xs text-muted-foreground">Use *italic* or **bold** for formatting.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor={`l2-detail-${i}`}>Detail</Label>
@@ -97,6 +98,7 @@ const Layer2Field = ({ bullets, onChange, errors }: Layer2FieldProps) => {
               placeholder="60–120 words of expanded detail"
               rows={4}
             />
+            <p className="text-xs text-muted-foreground">Use *italic* or **bold** for formatting.</p>
           </div>
         </div>
       ))}

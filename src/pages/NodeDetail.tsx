@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { ArrowLeft, ChevronRight, BookOpen, Lightbulb, ExternalLink } from 'lucide-react';
+import MarkdownText from '@/components/MarkdownText';
 import { supabase } from '@/integrations/supabase/client';
 import { trackEvent } from '@/lib/analytics';
 import AppLayout from '@/components/layout/AppLayout';
@@ -162,9 +163,7 @@ const NodeDetail = () => {
         {/* ── Layer 1: Always-visible answer ── */}
         <section className="mb-10">
           <div className="surface-elevated rounded-xl border border-border p-6">
-            <p className="font-body text-base text-foreground leading-relaxed">
-              {node.layer1}
-            </p>
+            <MarkdownText content={node.layer1 ?? ''} className="font-body text-base text-foreground leading-relaxed" />
           </div>
         </section>
 
@@ -198,16 +197,12 @@ const NodeDetail = () => {
                           <h3 className="font-display text-sm font-semibold text-foreground leading-snug">
                             {bullet.title}
                           </h3>
-                          <p className="mt-1 text-sm text-muted-foreground font-body">
-                            {bullet.summary}
-                          </p>
+                          <MarkdownText content={bullet.summary} className="mt-1 text-sm text-muted-foreground font-body" />
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="pb-5">
                         <div className="border-t border-border pt-4">
-                          <p className="text-sm text-foreground font-body leading-relaxed whitespace-pre-line">
-                            {bullet.detail}
-                          </p>
+                          <MarkdownText content={bullet.detail} className="text-sm text-foreground font-body leading-relaxed whitespace-pre-line" />
                         </div>
                       </AccordionContent>
                     </AccordionItem>

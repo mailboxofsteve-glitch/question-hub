@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Search, X, ChevronRight, ArrowLeft } from 'lucide-react';
+import MarkdownText from '@/components/MarkdownText';
 import AppLayout from '@/components/layout/AppLayout';
 import { useNodeSearch } from '@/hooks/use-node-search';
 
@@ -124,9 +125,7 @@ const SearchResults = () => {
                       </h3>
                     </div>
                     {node.layer1 && (
-                      <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2 font-body">
-                        {node.layer1}
-                      </p>
+                      <MarkdownText content={node.layer1} className="mt-1.5 text-sm text-muted-foreground line-clamp-2 font-body" />
                     )}
                     {node.category && (
                       <span className="inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-subtle text-accent-foreground">
