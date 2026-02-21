@@ -8,6 +8,7 @@ export interface ReasoningBullet {
   title: string;
   summary: string;
   detail: string;
+  video_url?: string;
 }
 
 function toSlug(title: string): string {
@@ -33,6 +34,7 @@ export function serializeLayer2(bullets: ReasoningBullet[]) {
         title: b.title.trim(),
         summary: b.summary.trim(),
         detail: b.detail.trim(),
+        ...(b.video_url?.trim() ? { video_url: b.video_url.trim() } : {}),
       })),
   };
 }
@@ -46,11 +48,12 @@ export function deserializeLayer2(json: unknown): ReasoningBullet[] {
     title: r.title || '',
     summary: r.summary || '',
     detail: r.detail || '',
+    video_url: r.video_url || '',
   }));
 }
 
 const Layer2Field = ({ bullets, onChange, errors }: Layer2FieldProps) => {
-  const add = () => onChange([...bullets, { title: '', summary: '', detail: '' }]);
+  const add = () => onChange([...bullets, { title: '', summary: '', detail: '', video_url: '' }]);
   const remove = (i: number) => onChange(bullets.filter((_, idx) => idx !== i));
   const update = (i: number, field: keyof ReasoningBullet, val: string) =>
     onChange(bullets.map((b, idx) => (idx === i ? { ...b, [field]: val } : b)));
@@ -99,6 +102,15 @@ const Layer2Field = ({ bullets, onChange, errors }: Layer2FieldProps) => {
               rows={4}
             />
             <p className="text-xs text-muted-foreground">Use *italic* or **bold** for formatting.</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`l2-video-${i}`}>Video URL (optional)</Label>
+            <Input
+              id={`l2-video-${i}`}
+              value={b.video_url || ''}
+              onChange={(e) => update(i, 'video_url', e.target.value)}
+              placeholder="YouTube or Vimeo URL"
+            />
           </div>
         </div>
       ))}
