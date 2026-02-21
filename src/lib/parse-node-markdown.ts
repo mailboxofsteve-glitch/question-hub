@@ -10,7 +10,7 @@ export interface ParsedNode {
   alt_phrasings: string[];
   published: boolean;
   layer1: string | null;
-  layer2_json: { reasoning: { id: string; title: string; summary: string; detail: string }[] };
+  layer2_json: { reasoning: { id: string; title: string; summary: string; detail: string; video_url?: string }[] };
   layer3_json: {
     resources?: { title: string; url?: string; description?: string }[];
     sources?: { title: string; description?: string }[];
@@ -194,8 +194,8 @@ function extractBulletListFromSubsection(section: string, heading: string): stri
     .filter((l) => l && !l.startsWith('<'));
 }
 
-function parseReasoning(section: string): { id: string; title: string; summary: string; detail: string }[] {
-  const bullets: { id: string; title: string; summary: string; detail: string }[] = [];
+function parseReasoning(section: string): { id: string; title: string; summary: string; detail: string; video_url?: string }[] {
+  const bullets: { id: string; title: string; summary: string; detail: string; video_url?: string }[] = [];
   // Split on #### headings
   const parts = section.split(/^####\s+/m).filter(Boolean);
 
@@ -208,11 +208,13 @@ function parseReasoning(section: string): { id: string; title: string; summary: 
 
     const fullText = lines.slice(1).join('\n');
 
-    const summaryMatch = fullText.match(/\*\*Summary.*?\*\*[:\s]*\n?([\s\S]*?)(?=\*\*Detail|\n---|\n####|$)/i);
-    const detailMatch = fullText.match(/\*\*Detail.*?\*\*[:\s]*\n?([\s\S]*?)(?=\n---|\n####|$)/i);
+    const summaryMatch = fullText.match(/\*\*Summary.*?\*\*[:\s]*\n?([\s\S]*?)(?=\*\*Detail|\*\*Video|\n---|\n####|$)/i);
+    const detailMatch = fullText.match(/\*\*Detail.*?\*\*[:\s]*\n?([\s\S]*?)(?=\*\*Video|\n---|\n####|$)/i);
+    const videoMatch = fullText.match(/\*\*Video.*?\*\*[:\s]*\n?\s*(https?:\/\/[^\s]+)/i);
 
     const summary = summaryMatch ? summaryMatch[1].trim() : '';
     const detail = detailMatch ? detailMatch[1].trim() : '';
+    const video_url = videoMatch ? videoMatch[1].trim() : undefined;
 
     if (!summary && !detail) continue;
 
@@ -222,7 +224,7 @@ function parseReasoning(section: string): { id: string; title: string; summary: 
       .replace(/\s+/g, '-')
       .slice(0, 40);
 
-    bullets.push({ id, title: titleLine, summary, detail });
+    bullets.push({ id, title: titleLine, summary, detail, ...(video_url ? { video_url } : {}) });
   }
 
   return bullets;

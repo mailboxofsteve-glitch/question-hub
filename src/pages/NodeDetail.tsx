@@ -23,6 +23,30 @@ interface ReasoningBullet {
   title: string;
   summary: string;
   detail: string;
+  video_url?: string;
+}
+
+function toEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    // youtube.com/watch?v=ID
+    if ((u.hostname === 'www.youtube.com' || u.hostname === 'youtube.com') && u.pathname === '/watch') {
+      const v = u.searchParams.get('v');
+      return v ? `https://www.youtube.com/embed/${v}` : null;
+    }
+    // youtu.be/ID
+    if (u.hostname === 'youtu.be') {
+      const id = u.pathname.slice(1);
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+    // vimeo.com/ID
+    if ((u.hostname === 'www.vimeo.com' || u.hostname === 'vimeo.com') && /^\/\d+/.test(u.pathname)) {
+      return `https://player.vimeo.com/video${u.pathname}`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 interface Layer2 {
@@ -203,6 +227,19 @@ const NodeDetail = () => {
                       <AccordionContent className="pb-5">
                         <div className="border-t border-border pt-4">
                           <MarkdownText content={bullet.detail} className="text-sm text-foreground font-body leading-relaxed whitespace-pre-line" />
+                          {bullet.video_url && (() => {
+                            const embedUrl = toEmbedUrl(bullet.video_url);
+                            return embedUrl ? (
+                              <div className="aspect-video mt-3">
+                                <iframe
+                                  src={embedUrl}
+                                  className="w-full h-full rounded-md"
+                                  allowFullScreen
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                />
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                       </AccordionContent>
                     </AccordionItem>
