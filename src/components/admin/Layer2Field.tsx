@@ -1,14 +1,17 @@
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Upload, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface ReasoningBullet {
   title: string;
   summary: string;
   detail: string;
   video_url?: string;
+  image_url?: string;
 }
 
 function toSlug(title: string): string {
@@ -23,6 +26,7 @@ interface Layer2FieldProps {
   bullets: ReasoningBullet[];
   onChange: (bullets: ReasoningBullet[]) => void;
   errors?: string;
+  nodeId?: string;
 }
 
 export function serializeLayer2(bullets: ReasoningBullet[]) {
@@ -35,6 +39,7 @@ export function serializeLayer2(bullets: ReasoningBullet[]) {
         summary: b.summary.trim(),
         detail: b.detail.trim(),
         ...(b.video_url?.trim() ? { video_url: b.video_url.trim() } : {}),
+        ...(b.image_url?.trim() ? { image_url: b.image_url.trim() } : {}),
       })),
   };
 }
@@ -49,14 +54,48 @@ export function deserializeLayer2(json: unknown): ReasoningBullet[] {
     summary: r.summary || '',
     detail: r.detail || '',
     video_url: r.video_url || '',
+    image_url: r.image_url || '',
   }));
 }
 
-const Layer2Field = ({ bullets, onChange, errors }: Layer2FieldProps) => {
-  const add = () => onChange([...bullets, { title: '', summary: '', detail: '', video_url: '' }]);
+const Layer2Field = ({ bullets, onChange, errors, nodeId }: Layer2FieldProps) => {
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const add = () => onChange([...bullets, { title: '', summary: '', detail: '', video_url: '', image_url: '' }]);
   const remove = (i: number) => onChange(bullets.filter((_, idx) => idx !== i));
   const update = (i: number, field: keyof ReasoningBullet, val: string) =>
     onChange(bullets.map((b, idx) => (idx === i ? { ...b, [field]: val } : b)));
+
+  const handleImageUpload = async (i: number, file: File) => {
+    if (!file) return;
+    setUploadingIndex(i);
+    try {
+      const ext = file.name.split('.').pop() || 'png';
+      const prefix = nodeId || 'draft';
+      const path = `${prefix}/${i}_${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('node-images').upload(path, file);
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from('node-images').getPublicUrl(path);
+      update(i, 'image_url', urlData.publicUrl);
+    } catch (err) {
+      console.error('Image upload failed:', err);
+    } finally {
+      setUploadingIndex(null);
+    }
+  };
+
+  const handleImageRemove = async (i: number) => {
+    const url = bullets[i].image_url;
+    if (url) {
+      // Extract path from public URL
+      const match = url.match(/node-images\/(.+)$/);
+      if (match) {
+        await supabase.storage.from('node-images').remove([match[1]]);
+      }
+    }
+    update(i, 'image_url', '');
+  };
 
   return (
     <div className="space-y-4">
@@ -103,6 +142,57 @@ const Layer2Field = ({ bullets, onChange, errors }: Layer2FieldProps) => {
             />
             <p className="text-xs text-muted-foreground">Use *italic* or **bold** for formatting.</p>
           </div>
+
+          {/* Image upload */}
+          <div className="space-y-2">
+            <Label>Image (optional)</Label>
+            {b.image_url ? (
+              <div className="relative inline-block">
+                <img
+                  src={b.image_url}
+                  alt={`Bullet ${i + 1}`}
+                  className="rounded-md max-h-40 object-contain border border-border"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute -top-2 -right-2 h-6 w-6"
+                  onClick={() => handleImageRemove(i)}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  ref={(el) => { fileInputRefs.current[i] = el; }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(i, file);
+                    e.target.value = '';
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={uploadingIndex === i}
+                  onClick={() => fileInputRefs.current[i]?.click()}
+                >
+                  {uploadingIndex === i ? (
+                    <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Uploading…</>
+                  ) : (
+                    <><Upload className="w-4 h-4 mr-1" /> Upload Image</>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor={`l2-video-${i}`}>Video URL (optional)</Label>
             <Input

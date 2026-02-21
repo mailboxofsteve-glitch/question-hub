@@ -24,6 +24,7 @@ interface ReasoningBullet {
   summary: string;
   detail: string;
   video_url?: string;
+  image_url?: string;
 }
 
 function toEmbedUrl(url: string): string | null {
@@ -227,6 +228,13 @@ const NodeDetail = () => {
                       <AccordionContent className="pb-5">
                         <div className="border-t border-border pt-4">
                           <MarkdownText content={bullet.detail} className="text-sm text-foreground font-body leading-relaxed whitespace-pre-line" />
+                          {bullet.image_url && (
+                            <img
+                              src={bullet.image_url}
+                              alt={bullet.title}
+                              className="mt-3 rounded-md w-full object-contain max-h-96"
+                            />
+                          )}
                           {bullet.video_url && (() => {
                             const embedUrl = toEmbedUrl(bullet.video_url);
                             return embedUrl ? (

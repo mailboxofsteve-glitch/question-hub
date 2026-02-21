@@ -149,7 +149,7 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
             <p className="text-xs text-muted-foreground">Use *italic* or **bold** for formatting.</p>
           </div>
 
-          <Layer2Field bullets={layer2Bullets} onChange={setLayer2Bullets} />
+          <Layer2Field bullets={layer2Bullets} onChange={setLayer2Bullets} nodeId={id} />
 
           <Layer3Field data={layer3Data} onChange={setLayer3Data} />
 
