@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
+import { useUserRole } from '@/hooks/use-user-role';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 
@@ -10,6 +11,7 @@ interface AppLayoutProps {
 
 const AppLayout = ({ children }: AppLayoutProps) => {
   const { user, signOut, loading } = useAuth();
+  const { hasRole } = useUserRole(user?.id, 'admin');
   const navigate = useNavigate();
 
   return (
@@ -40,6 +42,11 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             <div className="h-8 w-px bg-border" />
             {!loading && user ? (
               <div className="flex items-center gap-3">
+                {hasRole && (
+                  <Link to="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    Node Admin
+                  </Link>
+                )}
                 <span className="text-sm text-muted-foreground truncate max-w-[160px]">
                   {user.email}
                 </span>
