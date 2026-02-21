@@ -4,7 +4,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-admin-password, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 function json(data: unknown, status = 200) {
@@ -12,10 +12,6 @@ function json(data: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-function unauthorized() {
-  return json({ error: "Unauthorized" }, 401);
 }
 
 function buildSearchBlob(data: Record<string, unknown>): string {
@@ -33,21 +29,48 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Validate admin password
-  const password = req.headers.get("x-admin-password");
-  const expectedPassword = Deno.env.get("ADMIN_PASSWORD");
-  if (!password || password !== expectedPassword) {
-    return unauthorized();
+  // --- Auth: validate JWT and check admin role ---
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return json({ error: "Unauthorized" }, 401);
   }
 
-  const supabase = createClient(
+  const token = authHeader.replace("Bearer ", "");
+  const anonClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } }
+  );
+
+  const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
+  if (claimsError || !claimsData?.claims) {
+    return json({ error: "Unauthorized" }, 401);
+  }
+
+  const userId = claimsData.claims.sub;
+
+  // Use service role client to check admin role (bypasses RLS)
+  const serviceClient = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
+  const { data: roleRow } = await serviceClient
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+
+  if (!roleRow) {
+    return json({ error: "Forbidden: admin role required" }, 403);
+  }
+
+  // --- Proceed with admin operations using service role client ---
+  const supabase = serviceClient;
+
   const url = new URL(req.url);
   const pathParts = url.pathname.split("/").filter(Boolean);
-  // Path: /admin-nodes or /admin-nodes/{id}
   const nodeId = pathParts.length > 1 ? decodeURIComponent(pathParts[pathParts.length - 1]) : null;
 
   try {
@@ -62,7 +85,6 @@ Deno.serve(async (req) => {
           if (error) return json({ error: error.message }, 404);
           return json(data);
         }
-        // List all nodes (including drafts)
         const publishedParam = url.searchParams.get("published");
         let query = supabase.from("nodes").select("*").order("updated_at", { ascending: false });
         if (publishedParam !== null) {
@@ -99,7 +121,6 @@ Deno.serve(async (req) => {
       case "PUT": {
         if (!nodeId) return json({ error: "Node ID required" }, 400);
         const body = await req.json();
-        // Only include fields that are present in the request body
         const updateData: Record<string, unknown> = {};
         if ("title" in body) updateData.title = body.title;
         if ("alt_phrasings" in body) updateData.alt_phrasings = body.alt_phrasings;
@@ -114,7 +135,6 @@ Deno.serve(async (req) => {
           return json({ error: "No fields to update" }, 400);
         }
 
-        // Fetch existing node to merge for search_blob rebuild
         const { data: existing, error: fetchErr } = await supabase
           .from("nodes")
           .select("title, layer1, keywords, alt_phrasings")

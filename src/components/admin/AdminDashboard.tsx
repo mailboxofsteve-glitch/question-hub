@@ -14,15 +14,19 @@ import ImportNodeDialog from './ImportNodeDialog';
 import ImportCsvDialog from './ImportCsvDialog';
 import WriterGuideDialog from './WriterGuideDialog';
 import type { ParsedNode } from '@/lib/parse-node-markdown';
+import type { Session } from '@supabase/supabase-js';
+import { useAuth } from '@/hooks/use-auth';
 
 type Node = Tables<'nodes'>;
 
 interface AdminDashboardProps {
-  password: string;
-  onLogout: () => void;
+  session: Session;
 }
 
-const AdminDashboard = ({ password, onLogout }: AdminDashboardProps) => {
+const AdminDashboard = ({ session }: AdminDashboardProps) => {
+  const { signOut } = useAuth();
+  const token = session.access_token;
+
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,21 +37,21 @@ const AdminDashboard = ({ password, onLogout }: AdminDashboardProps) => {
   const fetchNodes = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await adminFetch('', password);
+      const data = await adminFetch('', token);
       setNodes(data);
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [password]);
+  }, [token]);
 
   useEffect(() => { fetchNodes(); }, [fetchNodes]);
 
   const handleCreate = async (data: Partial<Node> & { id: string; title: string }) => {
     setSaving(true);
     try {
-      await adminFetch('', password, { method: 'POST', body: JSON.stringify(data) });
+      await adminFetch('', token, { method: 'POST', body: JSON.stringify(data) });
       toast({ title: 'Node created' });
       setView('list');
       fetchNodes();
@@ -61,7 +65,6 @@ const AdminDashboard = ({ password, onLogout }: AdminDashboardProps) => {
   const handleUpdate = async (data: Partial<Node> & { id: string; title: string }) => {
     setSaving(true);
     try {
-      // Only send fields that actually changed to avoid hitting size limits
       const changes: Record<string, unknown> = {};
       if (editingNode) {
         for (const key of Object.keys(data) as Array<keyof typeof data>) {
@@ -72,7 +75,7 @@ const AdminDashboard = ({ password, onLogout }: AdminDashboardProps) => {
         }
       }
       const payload = Object.keys(changes).length > 0 ? changes : data;
-      await adminFetch(`/${encodeURIComponent(data.id)}`, password, {
+      await adminFetch(`/${encodeURIComponent(data.id)}`, token, {
         method: 'PUT',
         body: JSON.stringify(payload),
       });
@@ -90,7 +93,7 @@ const AdminDashboard = ({ password, onLogout }: AdminDashboardProps) => {
   const handleDelete = async (id: string) => {
     if (!confirm(`Delete node "${id}"? This cannot be undone.`)) return;
     try {
-      await adminFetch(`/${encodeURIComponent(id)}`, password, { method: 'DELETE' });
+      await adminFetch(`/${encodeURIComponent(id)}`, token, { method: 'DELETE' });
       toast({ title: 'Node deleted' });
       fetchNodes();
     } catch (err: any) {
@@ -158,7 +161,7 @@ const AdminDashboard = ({ password, onLogout }: AdminDashboardProps) => {
             <Button onClick={() => setView('create')}>
               <Plus className="w-4 h-4 mr-1" /> New Node
             </Button>
-            <Button variant="ghost" size="icon" onClick={onLogout} title="Log out">
+            <Button variant="ghost" size="icon" onClick={signOut} title="Log out">
               <LogOut className="w-4 h-4" />
             </Button>
           </div>
