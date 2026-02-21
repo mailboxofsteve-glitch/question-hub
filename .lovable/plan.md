@@ -1,65 +1,82 @@
 
 
-## Add Video Embedding to Layer 2 Reasoning Bullets
+## Add Image Uploads to Layer 2 Reasoning Bullets
 
 ### Overview
-Add an optional video embed (YouTube/Vimeo) to each reasoning bullet in Layer 2. This is a lightweight change -- no database migration or new dependencies needed since `layer2_json` is already a flexible JSON column.
+Add an optional image to each reasoning bullet, displayed between the detail text and the embedded video. Images will be stored in Lovable Cloud storage. Like the video feature, this requires no database migration since `layer2_json` is a flexible JSON column.
 
 ### What Changes
 
-**1. Update the ReasoningBullet type and serialization** -- `src/components/admin/Layer2Field.tsx`
-- Add `video_url?: string` to the `ReasoningBullet` interface
-- Include `video_url` in `serializeLayer2` and `deserializeLayer2`
+**1. Create a storage bucket** (database migration)
+- Create a public `node-images` bucket in Cloud storage
+- Add an RLS policy allowing anyone to read images (public content)
+- Add an RLS policy allowing authenticated admin users to upload/delete images
 
-**2. Add a video URL input to the admin form** -- `src/components/admin/Layer2Field.tsx`
-- Add an `Input` field labeled "Video URL (optional)" below the Detail textarea in each bullet card
-- Placeholder text: "YouTube or Vimeo URL"
+**2. Update the ReasoningBullet type and serialization** -- `src/components/admin/Layer2Field.tsx`
+- Add `image_url?: string` to the `ReasoningBullet` interface
+- Include `image_url` in `serializeLayer2` and `deserializeLayer2`
 
-**3. Update the NodeDetail page to render embedded videos** -- `src/pages/NodeDetail.tsx`
-- Add `video_url?: string` to the local `ReasoningBullet` interface
-- Create a small helper function to convert watch URLs to embed URLs:
-  - `youtube.com/watch?v=ID` to `youtube.com/embed/ID`
-  - `youtu.be/ID` to `youtube.com/embed/ID`
-  - `vimeo.com/ID` to `player.vimeo.com/video/ID`
-- Render a responsive `iframe` below the detail text when `video_url` is present
+**3. Add image upload UI to the admin form** -- `src/components/admin/Layer2Field.tsx`
+- Add an image upload section between the Detail textarea and the Video URL input
+- Show a file input button labeled "Upload Image (optional)"
+- When an image is already uploaded, show a thumbnail preview with a remove button
+- On file select, upload to Cloud storage at path `node-images/{nodeId}/{bulletIndex}_{timestamp}.{ext}` and store the resulting public URL in `image_url`
 
-**4. Update the Markdown import parser (optional)** -- `src/lib/parse-node-markdown.ts`
-- Support an optional `**Video:**` line within each `####` reasoning bullet section
-- Parse the URL into the `video_url` field
+**4. Render the image on the NodeDetail page** -- `src/pages/NodeDetail.tsx`
+- Add `image_url?: string` to the local `ReasoningBullet` interface
+- Render an `<img>` tag after the detail text and before the video embed when `image_url` is present
+- Style with rounded corners and responsive width
 
 ### Files Changed
 
 | File | Change |
 |---|---|
-| `src/components/admin/Layer2Field.tsx` | Add `video_url` to type, serialization, and form UI |
-| `src/pages/NodeDetail.tsx` | Add embed rendering with URL conversion helper |
-| `src/lib/parse-node-markdown.ts` | Support optional `**Video:**` line in reasoning bullets |
-
-### No Database Changes Required
-The `layer2_json` column stores arbitrary JSON, so adding a new optional field to the reasoning bullet objects requires zero schema changes.
+| New migration SQL | Create `node-images` storage bucket with RLS policies |
+| `src/components/admin/Layer2Field.tsx` | Add `image_url` to type, serialization, file upload UI with preview |
+| `src/pages/NodeDetail.tsx` | Render image between detail and video |
 
 ### Technical Details
 
-**URL conversion helper:**
+**Storage bucket setup (migration):**
 ```text
-function toEmbedUrl(url: string): string | null
-  - Match youtube.com/watch?v=ID -> youtube.com/embed/ID
-  - Match youtu.be/ID -> youtube.com/embed/ID
-  - Match vimeo.com/ID -> player.vimeo.com/video/ID
-  - Return null if unrecognized (don't render iframe)
+INSERT INTO storage.buckets (id, name, public) VALUES ('node-images', 'node-images', true);
+
+-- Anyone can view images (public site)
+CREATE POLICY "Public read node images" ON storage.objects
+  FOR SELECT USING (bucket_id = 'node-images');
+
+-- Only admins can upload/delete
+CREATE POLICY "Admins can upload node images" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'node-images'
+    AND public.has_role(auth.uid(), 'admin')
+  );
+
+CREATE POLICY "Admins can delete node images" ON storage.objects
+  FOR DELETE USING (
+    bucket_id = 'node-images'
+    AND public.has_role(auth.uid(), 'admin')
+  );
 ```
 
-**Iframe rendering (responsive):**
+**Upload flow in admin form:**
+- User selects a file via `<input type="file" accept="image/*">`
+- File is uploaded to storage using `supabase.storage.from('node-images').upload(path, file)`
+- Public URL is obtained via `supabase.storage.from('node-images').getPublicUrl(path)`
+- The URL is stored in the bullet's `image_url` field
+- A loading spinner shows during upload
+
+**Image rendering on NodeDetail (between detail and video):**
 ```text
-<div className="aspect-video mt-3">
-  <iframe
-    src={embedUrl}
-    className="w-full h-full rounded-md"
-    allowFullScreen
-    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+{bullet.image_url && (
+  <img
+    src={bullet.image_url}
+    alt={bullet.title}
+    className="mt-3 rounded-md w-full object-contain max-h-96"
   />
-</div>
+)}
 ```
 
-**Security note:** Only YouTube and Vimeo domains will be allowed in the embed. Unrecognized URLs are silently ignored (no iframe rendered).
+**Removing an image:**
+- In the admin form, a small "X" button next to the preview deletes the file from storage and clears `image_url`
 
