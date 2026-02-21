@@ -9,7 +9,8 @@ import { adminFetch } from '@/hooks/use-admin';
 import { Tables } from '@/integrations/supabase/types';
 import { toast } from '@/hooks/use-toast';
 import NodeForm from './NodeForm';
-import { Plus, Pencil, Trash2, LogOut } from 'lucide-react';
+import { Plus, Pencil, Trash2, LogOut, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import ImportNodeDialog from './ImportNodeDialog';
 import ImportCsvDialog from './ImportCsvDialog';
 import WriterGuideDialog from './WriterGuideDialog';
@@ -132,6 +133,9 @@ const AdminDashboard = ({ session }: AdminDashboardProps) => {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
+          <Link to="/" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            <ArrowLeft className="w-4 h-4" /> Home
+          </Link>
           <h1 className="font-display text-2xl font-semibold">Node Admin</h1>
           <div className="flex gap-2">
             <ImportNodeDialog
