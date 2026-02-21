@@ -52,6 +52,8 @@ const WriterGuideDialog = () => (
               <li><strong>Title</strong> — Short label (a slug ID is auto-generated from this).</li>
               <li><strong>Summary</strong> — One-sentence overview of the point.</li>
               <li><strong>Detail</strong> — Expanded explanation, <strong>60–120 words</strong>. Supports Markdown formatting.</li>
+              <li><strong>Image (optional)</strong> — Upload a still image to illustrate the point. Supported formats: JPG, PNG, WebP, GIF. The image appears below the detail text.</li>
+              <li><strong>Video URL (optional)</strong> — Paste a YouTube or Vimeo link to embed a video. The video appears below the image (if any). Standard watch URLs are automatically converted to embeds.</li>
             </ul>
             <p className="mt-2 text-muted-foreground">Add as many bullets as needed using the "+ Add Bullet" button.</p>
           </section>

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tables } from '@/integrations/supabase/types';
 import { ArrowLeft } from 'lucide-react';
 import AltPhrasingsField from './AltPhrasingsField';
+import WriterGuideDialog from './WriterGuideDialog';
 import Layer2Field, { ReasoningBullet, serializeLayer2, deserializeLayer2 } from './Layer2Field';
 import Layer3Field, { Layer3Data, serializeLayer3, deserializeLayer3 } from './Layer3Field';
 
@@ -86,6 +87,9 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
           <CardTitle className="font-display text-lg">
             {isEditing ? 'Edit Node' : 'Create Node'}
           </CardTitle>
+          <div className="ml-auto">
+            <WriterGuideDialog />
+          </div>
         </div>
       </CardHeader>
       <CardContent>
