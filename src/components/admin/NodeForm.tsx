@@ -6,9 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tables } from '@/integrations/supabase/types';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
 import AltPhrasingsField from './AltPhrasingsField';
 import WriterGuideDialog from './WriterGuideDialog';
+import { serializeNodeMarkdown } from '@/lib/serialize-node-markdown';
 import Layer2Field, { ReasoningBullet, serializeLayer2, deserializeLayer2 } from './Layer2Field';
 import Layer3Field, { Layer3Data, serializeLayer3, deserializeLayer3 } from './Layer3Field';
 
@@ -77,6 +78,21 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
     });
   };
 
+  const handleDownload = () => {
+    const md = serializeNodeMarkdown({
+      id, title, category, keywords,
+      altPhrasings, published, layer1,
+      layer2Bullets, layer3Data,
+    });
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${id}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -87,7 +103,12 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
           <CardTitle className="font-display text-lg">
             {isEditing ? 'Edit Node' : 'Create Node'}
           </CardTitle>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            {isEditing && (
+              <Button variant="ghost" size="icon" onClick={handleDownload} title="Download .md">
+                <Download className="w-4 h-4" />
+              </Button>
+            )}
             <WriterGuideDialog />
           </div>
         </div>
