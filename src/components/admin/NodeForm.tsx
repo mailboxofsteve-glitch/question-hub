@@ -20,6 +20,7 @@ interface NodeFormProps {
   onSubmit: (data: Partial<Node> & { id: string; title: string }) => Promise<void>;
   onCancel: () => void;
   loading?: boolean;
+  canPublish?: boolean;
 }
 
 function parseAltPhrasings(val: unknown): string[] {
@@ -33,7 +34,7 @@ function parseAltPhrasings(val: unknown): string[] {
   return [];
 }
 
-const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
+const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: NodeFormProps) => {
   const isEditing = !!node;
 
   const [id, setId] = useState(node?.id ?? '');
@@ -184,10 +185,13 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
           <Layer3Field data={layer3Data} onChange={setLayer3Data} />
 
           <div className="flex items-center gap-3 pt-2">
-            <Switch id="published" checked={published} onCheckedChange={setPublished} />
-            <Label htmlFor="published" className="cursor-pointer">
+            <Switch id="published" checked={published} onCheckedChange={setPublished} disabled={!canPublish} />
+            <Label htmlFor="published" className={canPublish ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}>
               {published ? 'Published' : 'Draft'}
             </Label>
+            {!canPublish && (
+              <span className="text-xs text-muted-foreground">Only editors can change publication status</span>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">

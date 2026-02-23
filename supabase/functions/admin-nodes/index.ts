@@ -55,16 +55,18 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  const { data: roleRow } = await serviceClient
+  const { data: roleRows } = await serviceClient
     .from("user_roles")
     .select("role")
     .eq("user_id", userId)
-    .eq("role", "admin")
-    .maybeSingle();
+    .in("role", ["admin", "editor"]);
 
-  if (!roleRow) {
-    return json({ error: "Forbidden: admin role required" }, 403);
+  const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
+  if (roles.length === 0) {
+    return json({ error: "Forbidden: admin or editor role required" }, 403);
   }
+
+  const isEditor = roles.includes("editor");
 
   // --- Proceed with admin operations using service role client ---
   const supabase = serviceClient;
@@ -109,7 +111,7 @@ Deno.serve(async (req) => {
           layer1: body.layer1 ?? null,
           layer2_json: body.layer2_json ?? {},
           layer3_json: body.layer3_json ?? {},
-          published: body.published ?? false,
+          published: isEditor ? (body.published ?? false) : false,
           search_blob: "",
         };
         insertData.search_blob = buildSearchBlob(insertData);
@@ -129,7 +131,7 @@ Deno.serve(async (req) => {
         if ("layer1" in body) updateData.layer1 = body.layer1;
         if ("layer2_json" in body) updateData.layer2_json = body.layer2_json;
         if ("layer3_json" in body) updateData.layer3_json = body.layer3_json;
-        if ("published" in body) updateData.published = body.published;
+        if ("published" in body && isEditor) updateData.published = body.published;
 
         if (Object.keys(updateData).length === 0) {
           return json({ error: "No fields to update" }, 400);

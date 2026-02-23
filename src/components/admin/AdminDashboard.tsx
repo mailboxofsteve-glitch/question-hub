@@ -22,9 +22,10 @@ type Node = Tables<'nodes'>;
 
 interface AdminDashboardProps {
   session: Session;
+  isEditor?: boolean;
 }
 
-const AdminDashboard = ({ session }: AdminDashboardProps) => {
+const AdminDashboard = ({ session, isEditor = false }: AdminDashboardProps) => {
   const { signOut } = useAuth();
   const token = session.access_token;
 
@@ -111,7 +112,7 @@ const AdminDashboard = ({ session }: AdminDashboardProps) => {
   if (view === 'create') {
     return (
       <div className="min-h-screen bg-background p-6 max-w-4xl mx-auto">
-        <NodeForm onSubmit={handleCreate} onCancel={() => setView('list')} loading={saving} />
+        <NodeForm onSubmit={handleCreate} onCancel={() => setView('list')} loading={saving} canPublish={isEditor} />
       </div>
     );
   }
@@ -124,6 +125,7 @@ const AdminDashboard = ({ session }: AdminDashboardProps) => {
           onSubmit={handleUpdate}
           onCancel={() => { setView('list'); setEditingNode(null); }}
           loading={saving}
+          canPublish={isEditor}
         />
       </div>
     );
