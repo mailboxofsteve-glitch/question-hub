@@ -1,0 +1,1 @@
+ALTER TABLE public.nodes ADD COLUMN created_by uuid REFERENCES auth.users(id);

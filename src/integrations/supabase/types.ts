@@ -45,6 +45,7 @@ export type Database = {
         Row: {
           alt_phrasings: Json | null
           category: string | null
+          created_by: string | null
           id: string
           keywords: string | null
           layer1: string | null
@@ -58,6 +59,7 @@ export type Database = {
         Insert: {
           alt_phrasings?: Json | null
           category?: string | null
+          created_by?: string | null
           id: string
           keywords?: string | null
           layer1?: string | null
@@ -71,6 +73,7 @@ export type Database = {
         Update: {
           alt_phrasings?: Json | null
           category?: string | null
+          created_by?: string | null
           id?: string
           keywords?: string | null
           layer1?: string | null
