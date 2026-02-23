@@ -1,84 +1,67 @@
 
 
-## Add "Download .md" Button to the Edit Node Form
+## Add Node Preview for Unpublished Nodes
 
 ### Overview
-Add a download button to the Node Form header (visible only when editing) that generates a properly formatted `.md` file from the current form state, matching the same template format that the import parser expects. This is purely a frontend feature -- no backend changes needed.
+Allow writers and editors to preview how a question node will look to readers before publishing it. A "Preview" button will be added to both the node list and the edit form, opening the full Node Detail view -- but without requiring the node to be published.
 
-### What Changes
+### How It Works
 
-**1. Create a markdown serializer** -- `src/lib/serialize-node-markdown.ts`
+A new route `/node/:id/preview` will render the same Node Detail layout but without the `published = true` filter, so draft nodes are visible. This route will show a banner at the top indicating the node is in preview/draft mode. The existing public `/node/:id` route remains unchanged (published only).
 
-A new utility function that takes the current form data and produces a markdown string following the writer template structure:
+### Changes
 
-```text
-## 0) Node Metadata
-**Node ID:** `the-slug`
-**Title (Question):**
-The Title Here
-**Category:** Physics
-**Keywords:**
-- keyword1
-- keyword2
-**Alt Phrasings:**
-- phrasing one
-- phrasing two
-**Status:** `published` or `draft`
-**Related Questions:**
-- `related-slug`
+**1. New preview page** -- `src/pages/NodePreview.tsx`
+- A copy-light version of `NodeDetail` that queries the node by ID without filtering on `published = true`
+- Shows a colored banner at the top: "Preview -- This node is not yet published"
+- Skips analytics tracking (no `view_node` event for previews)
+- Related nodes query also removes the `published` filter so editors can see the full picture
 
-## 1) Layer 1 — Quick Answer
-The layer 1 text here...
+**2. Register the route** -- `src/App.tsx`
+- Add route: `/node/:id/preview` pointing to `NodePreview`
 
-## 2) Layer 2 — Reasoning
-#### Bullet Title
-**Summary:**
-The summary text
-**Detail:**
-The detail text
-**Image:** https://...  (if present)
-**Video:** https://...  (if present)
+**3. Add Preview button to the admin node list** -- `src/components/admin/AdminDashboard.tsx`
+- Add an "Eye" icon button in the Actions column (next to Edit and Delete)
+- Clicking it opens `/node/{id}/preview` in a new tab via `window.open`
 
-## 3) Layer 3 — Next Steps
-### Dig Deeper
-- **Title** — description
-### Sources
-- Author, Title — note
-### Related Questions
-- `slug-id`
-```
-
-**2. Add download button to NodeForm header** -- `src/components/admin/NodeForm.tsx`
-
-- Import the serializer and the `Download` icon from lucide-react
-- Add a "Download .md" button next to the Writer's Guide button, only visible when `isEditing` is true
-- On click, generate the markdown string from current form state, create a Blob, and trigger a browser download with filename `{id}.md`
+**4. Add Preview button to the edit form** -- `src/components/admin/NodeForm.tsx`
+- Add an "Eye" icon button in the header (next to Download and Writer's Guide), visible only when editing
+- Opens `/node/{id}/preview` in a new tab
 
 ### Header layout when editing:
 
 ```text
-[Back]  Edit Node          [Download] [?]
+[Back]  Edit Node          [Preview] [Download] [?]
 ```
 
 ### Files Changed
 
 | File | Change |
 |---|---|
-| `src/lib/serialize-node-markdown.ts` | New file -- converts node form data to formatted .md string |
-| `src/components/admin/NodeForm.tsx` | Add download button in header (edit mode only) |
+| `src/pages/NodePreview.tsx` | New file -- Node Detail view without published filter, with draft banner |
+| `src/App.tsx` | Add `/node/:id/preview` route |
+| `src/components/admin/AdminDashboard.tsx` | Add Preview (eye) icon button in table actions |
+| `src/components/admin/NodeForm.tsx` | Add Preview (eye) icon button in form header |
 
 ### Technical Details
 
-**Download trigger (no libraries needed):**
+**NodePreview query (no published filter):**
 ```text
-const blob = new Blob([markdownString], { type: 'text/markdown' });
-const url = URL.createObjectURL(blob);
-const a = document.createElement('a');
-a.href = url;
-a.download = `${id}.md`;
-a.click();
-URL.revokeObjectURL(url);
+const { data, error } = await supabase
+  .from('nodes')
+  .select('*')
+  .eq('id', id)
+  .single();
 ```
 
-**Round-trip compatibility:** The serializer output will match the format expected by `parseNodeMarkdown`, so a downloaded file can be re-imported without errors. The Image and Video fields in Layer 2 bullets will be included when present.
+**Draft banner:**
+```text
+{!node.published && (
+  <div className="bg-amber-100 text-amber-800 text-sm font-medium px-4 py-2 rounded-md mb-6 text-center">
+    Preview -- This node is not published yet
+  </div>
+)}
+```
+
+**Security consideration:** The preview route queries directly from the client. Since the `nodes` table data is already accessible via the admin edge function and the public endpoint only shows published nodes, no RLS changes are needed. The preview URL is not discoverable by regular users, and even if accessed, it only shows node content (which is intended to be public once published). If stricter access control is desired later, an admin-only guard can be added.
 
