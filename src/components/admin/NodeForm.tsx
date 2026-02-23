@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tables } from '@/integrations/supabase/types';
-import { ArrowLeft, Download } from 'lucide-react';
+import { ArrowLeft, Download, Eye } from 'lucide-react';
 import AltPhrasingsField from './AltPhrasingsField';
 import WriterGuideDialog from './WriterGuideDialog';
 import { serializeNodeMarkdown } from '@/lib/serialize-node-markdown';
@@ -104,6 +104,11 @@ const NodeForm = ({ node, onSubmit, onCancel, loading }: NodeFormProps) => {
             {isEditing ? 'Edit Node' : 'Create Node'}
           </CardTitle>
           <div className="ml-auto flex items-center gap-1">
+            {isEditing && (
+              <Button variant="ghost" size="icon" onClick={() => window.open(`/node/${id}/preview`, '_blank')} title="Preview">
+                <Eye className="w-4 h-4" />
+              </Button>
+            )}
             {isEditing && (
               <Button variant="ghost" size="icon" onClick={handleDownload} title="Download .md">
                 <Download className="w-4 h-4" />

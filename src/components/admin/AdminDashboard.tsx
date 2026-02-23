@@ -9,7 +9,7 @@ import { adminFetch } from '@/hooks/use-admin';
 import { Tables } from '@/integrations/supabase/types';
 import { toast } from '@/hooks/use-toast';
 import NodeForm from './NodeForm';
-import { Plus, Pencil, Trash2, LogOut, ArrowLeft } from 'lucide-react';
+import { Plus, Pencil, Trash2, LogOut, ArrowLeft, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ImportNodeDialog from './ImportNodeDialog';
 import ImportCsvDialog from './ImportCsvDialog';
@@ -215,6 +215,14 @@ const AdminDashboard = ({ session }: AdminDashboardProps) => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => window.open(`/node/${node.id}/preview`, '_blank')}
+                            title="Preview"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
