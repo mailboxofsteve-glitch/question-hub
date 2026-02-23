@@ -8,7 +8,9 @@ import { ShieldX } from 'lucide-react';
 
 const Admin = () => {
   const { user, session, loading: authLoading } = useAuth();
-  const { hasRole: isAdmin, loading: roleLoading } = useUserRole(user?.id, 'admin');
+  const { hasRole: isAdmin, loading: adminLoading } = useUserRole(user?.id, 'admin');
+  const { hasRole: isEditor, loading: editorLoading } = useUserRole(user?.id, 'editor');
+  const roleLoading = adminLoading || editorLoading;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,7 +27,7 @@ const Admin = () => {
     );
   }
 
-  if (!isAdmin) {
+  if (!isAdmin && !isEditor) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-sm text-center">
@@ -45,7 +47,7 @@ const Admin = () => {
     );
   }
 
-  return <AdminDashboard session={session!} />;
+  return <AdminDashboard session={session!} isEditor={isEditor} />;
 };
 
 export default Admin;

@@ -11,7 +11,8 @@ interface AppLayoutProps {
 
 const AppLayout = ({ children }: AppLayoutProps) => {
   const { user, signOut, loading } = useAuth();
-  const { hasRole } = useUserRole(user?.id, 'admin');
+  const { hasRole: isAdmin } = useUserRole(user?.id, 'admin');
+  const { hasRole: isEditor } = useUserRole(user?.id, 'editor');
   const navigate = useNavigate();
 
   return (
@@ -42,7 +43,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             <div className="h-8 w-px bg-border" />
             {!loading && user ? (
               <div className="flex items-center gap-3">
-                {hasRole && (
+                {(isAdmin || isEditor) && (
                   <Link to="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                     Node Admin
                   </Link>
