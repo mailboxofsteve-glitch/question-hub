@@ -124,7 +124,15 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      user_roles_with_email: {
+        Row: {
+          email: string | null
+          id: string | null
+          role: Database["public"]["Enums"]["app_role"] | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
