@@ -195,9 +195,10 @@ const AdminDashboard = ({ session, isEditor = false }: AdminDashboardProps) => {
                   <TableRow>
                     <TableHead>ID</TableHead>
                     <TableHead>Title</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Updated</TableHead>
+                     <TableHead>Category</TableHead>
+                     <TableHead>Submitted By</TableHead>
+                     <TableHead>Status</TableHead>
+                     <TableHead>Updated</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -207,6 +208,9 @@ const AdminDashboard = ({ session, isEditor = false }: AdminDashboardProps) => {
                       <TableCell className="font-mono text-xs">{node.id}</TableCell>
                       <TableCell className="font-medium">{node.title}</TableCell>
                       <TableCell>{node.category ?? '—'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {(node as any).created_by_email ?? '—'}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={node.published ? 'default' : 'secondary'}>
                           {node.published ? 'Published' : 'Draft'}

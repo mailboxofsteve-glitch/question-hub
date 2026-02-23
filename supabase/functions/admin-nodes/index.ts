@@ -94,7 +94,24 @@ Deno.serve(async (req) => {
         }
         const { data, error } = await query;
         if (error) return json({ error: error.message }, 500);
-        return json(data);
+
+        // Lookup creator emails from profiles table
+        const creatorIds = [...new Set((data ?? []).map((n: any) => n.created_by).filter(Boolean))];
+        let emailMap: Record<string, string> = {};
+        if (creatorIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, email")
+            .in("id", creatorIds);
+          for (const p of profiles ?? []) {
+            if (p.email) emailMap[p.id] = p.email;
+          }
+        }
+        const enriched = (data ?? []).map((n: any) => ({
+          ...n,
+          created_by_email: n.created_by ? (emailMap[n.created_by] ?? null) : null,
+        }));
+        return json(enriched);
       }
 
       case "POST": {
@@ -113,6 +130,7 @@ Deno.serve(async (req) => {
           layer3_json: body.layer3_json ?? {},
           published: isEditor ? (body.published ?? false) : false,
           search_blob: "",
+          created_by: userId,
         };
         insertData.search_blob = buildSearchBlob(insertData);
         const { data, error } = await supabase.from("nodes").insert(insertData).select().single();
