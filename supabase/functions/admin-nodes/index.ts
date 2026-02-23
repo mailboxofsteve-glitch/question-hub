@@ -158,6 +158,7 @@ Deno.serve(async (req) => {
       }
 
       case "DELETE": {
+        if (!isEditor) return json({ error: "Forbidden: only editors can delete nodes" }, 403);
         if (!nodeId) return json({ error: "Node ID required" }, 400);
         const { error } = await supabase.from("nodes").delete().eq("id", nodeId);
         if (error) return json({ error: error.message }, 400);
