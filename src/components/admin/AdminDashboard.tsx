@@ -229,13 +229,16 @@ const AdminDashboard = ({ session, isEditor = false }: AdminDashboardProps) => {
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => { setEditingNode(node); setView('edit'); }}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
+                          {(isEditor || (node as any).created_by === session.user.id) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => { setEditingNode(node); setView('edit'); }}
+                              title="Edit"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          )}
                           {isEditor && (
                             <Button
                               variant="ghost"
