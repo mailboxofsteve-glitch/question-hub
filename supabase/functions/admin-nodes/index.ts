@@ -157,10 +157,18 @@ Deno.serve(async (req) => {
 
         const { data: existing, error: fetchErr } = await supabase
           .from("nodes")
-          .select("title, layer1, keywords, alt_phrasings")
+          .select("title, layer1, keywords, alt_phrasings, created_by")
           .eq("id", nodeId)
           .single();
         if (fetchErr) return json({ error: fetchErr.message }, 400);
+
+        // Admin (non-editor) can only edit their own nodes, and edits revert to draft
+        if (!isEditor) {
+          if (existing.created_by !== userId) {
+            return json({ error: "Forbidden: you can only edit nodes you created" }, 403);
+          }
+          updateData.published = false;
+        }
 
         const merged = { ...existing, ...updateData };
         updateData.search_blob = buildSearchBlob(merged);
