@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import NodePreview from "./pages/NodePreview";
+import RouteAnnouncer from "./components/RouteAnnouncer";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+        <RouteAnnouncer />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/search" element={<SearchResults />} />

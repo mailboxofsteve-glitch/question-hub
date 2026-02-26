@@ -75,6 +75,7 @@ const NodeDetail = () => {
   const { addItem } = useRecentlyViewed();
   const [readingProgress, setReadingProgress] = useState(0);
   const articleRef = useRef<HTMLElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
 
   // Reading progress bar
   useEffect(() => {
@@ -127,13 +128,15 @@ const NodeDetail = () => {
   const resources = layer3.resources ?? [];
   const sources = layer3.sources ?? [];
 
-  // Track view + save to recently viewed
+  // Track view + save to recently viewed + focus title for screen readers
   const trackedRef = useRef<string | null>(null);
   useEffect(() => {
     if (node?.id && trackedRef.current !== node.id) {
       trackedRef.current = node.id;
       trackEvent('view_node', node.id);
       addItem({ id: node.id, title: node.title, category: node.category });
+      // Focus the title so screen readers announce it
+      titleRef.current?.focus();
     }
   }, [node?.id, node?.title, node?.category, addItem]);
 
@@ -222,7 +225,7 @@ const NodeDetail = () => {
 
         {/* Title + Share */}
         <div className="flex items-start justify-between gap-3 mb-6">
-          <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground leading-tight">
+          <h1 ref={titleRef} tabIndex={-1} className="font-display text-3xl md:text-4xl font-bold text-foreground leading-tight outline-none">
             {node.title}
           </h1>
           <Button variant="ghost" size="icon" onClick={handleCopyLink} aria-label="Copy link to clipboard" className="shrink-0 mt-1">
@@ -249,7 +252,7 @@ const NodeDetail = () => {
                 <h2 className="font-display text-xl font-semibold text-foreground flex-1 text-left">
                   Reasoning
                 </h2>
-                <ChevronRight className="w-5 h-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" />
+                <ChevronRight className="w-5 h-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" aria-hidden="true" />
               </CollapsibleTrigger>
 
               <CollapsibleContent className="mt-4">
@@ -284,12 +287,13 @@ const NodeDetail = () => {
                             const embedUrl = toEmbedUrl(bullet.video_url);
                             return embedUrl ? (
                               <div className="aspect-video mt-3">
-                                <iframe
+                                 <iframe
                                   src={embedUrl}
+                                  title={`Video: ${bullet.title}`}
                                   className="w-full h-full rounded-md"
                                   allowFullScreen
                                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                />
+                                 />
                               </div>
                             ) : null;
                           })()}
@@ -365,7 +369,7 @@ const NodeDetail = () => {
                           </p>
                         )}
                       </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0 group-hover:text-accent transition-colors" />
+                      <ChevronRight className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0 group-hover:text-accent transition-colors" aria-hidden="true" />
                     </Link>
                   ))}
                 </div>
@@ -380,12 +384,12 @@ const NodeDetail = () => {
             <Collapsible>
               <CollapsibleTrigger className="flex items-center gap-2 w-full group cursor-pointer">
                 <div className="w-8 h-8 rounded-md bg-amber-subtle flex items-center justify-center">
-                  <BookOpen className="w-4 h-4 text-accent" />
+                  <BookOpen className="w-4 h-4 text-accent" aria-hidden="true" />
                 </div>
                 <h2 className="font-display text-xl font-semibold text-foreground flex-1 text-left">
                   Sources
                 </h2>
-                <ChevronRight className="w-5 h-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" />
+                <ChevronRight className="w-5 h-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" aria-hidden="true" />
               </CollapsibleTrigger>
 
               <CollapsibleContent className="mt-4">
