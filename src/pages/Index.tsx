@@ -107,20 +107,21 @@ const Index = () => {
 
       {/* Search Results */}
       {hasActiveSearch && (
-        <section className="container pb-12">
+        <section className="container pb-12" aria-label="Search results">
           <div className="max-w-2xl mx-auto">
+            <h2 className="sr-only">Search Results</h2>
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-muted-foreground font-body">
+              <p className="text-sm text-muted-foreground font-body" aria-live="polite" aria-atomic="true">
                 {isSearching ? "Searching…" : `${results.length} result${results.length !== 1 ? "s" : ""}`}
               </p>
-              <button onClick={clearSearch} className="text-sm text-accent hover:underline font-medium">
+              <button onClick={clearSearch} className="text-sm text-accent hover:underline font-medium" aria-label="Clear search results">
                 Clear
               </button>
             </div>
             {isSearching ? (
               <SearchSkeleton />
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2" aria-busy={isSearching}>
                 {results.map((node) => (
                   <Link
                     key={node.id}
@@ -136,12 +137,12 @@ const Index = () => {
                           <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2 font-body">{node.layer1}</p>
                         )}
                         {node.category && (
-                          <span className="inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-subtle text-accent-foreground">
+                   <span className="inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-subtle text-accent-foreground" aria-label={`Category: ${node.category}`}>
                             {node.category}
                           </span>
                         )}
                       </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground mt-1 shrink-0 group-hover:text-accent transition-colors" />
+                      <ChevronRight className="w-4 h-4 text-muted-foreground mt-1 shrink-0 group-hover:text-accent transition-colors" aria-hidden="true" />
                     </div>
                   </Link>
                 ))}
@@ -184,7 +185,7 @@ const Index = () => {
                           </span>
                         )}
                       </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 group-hover:text-accent transition-colors" />
+                      <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 group-hover:text-accent transition-colors" aria-hidden="true" />
                     </Link>
                   ))}
                 </div>
@@ -208,7 +209,7 @@ const Index = () => {
                     Answer guided questions to find the right information.
                   </p>
                 </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-accent transition-colors shrink-0" />
+                <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-accent transition-colors shrink-0" aria-hidden="true" />
               </Link>
             </div>
 
@@ -221,6 +222,7 @@ const Index = () => {
                     <button
                       key={cat}
                       onClick={() => setSelectedCategory(cat)}
+                      aria-label={`Browse category: ${cat}`}
                       className="p-4 rounded-lg border border-border surface-elevated text-left hover:border-accent/40 hover:glow-amber transition-all duration-200 group"
                     >
                       <span className="font-display text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
@@ -233,8 +235,8 @@ const Index = () => {
             )}
 
             {/* Features */}
-            <div className="h-px bg-border" />
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="h-px bg-border" aria-hidden="true" />
+            <div className="grid md:grid-cols-3 gap-8" role="region" aria-label="Features">
               {[
                 {
                   title: "Connected Nodes",
@@ -249,8 +251,8 @@ const Index = () => {
                   desc: "Find answers by title, keywords, alternative phrasings, or content.",
                 },
               ].map((feature) => (
-                <div key={feature.title} className="space-y-3">
-                  <div className="w-10 h-10 rounded-md bg-amber-subtle flex items-center justify-center">
+              <div key={feature.title} className="space-y-3">
+                  <div className="w-10 h-10 rounded-md bg-amber-subtle flex items-center justify-center" aria-hidden="true">
                     <div className="w-2.5 h-2.5 rounded-full bg-accent" />
                   </div>
                   <h3 className="font-display text-lg font-semibold text-foreground">{feature.title}</h3>
@@ -263,7 +265,7 @@ const Index = () => {
       )}
 
       {/* Footer */}
-      <footer className="border-t border-border">
+      <footer className="border-t border-border" role="contentinfo">
         <div className="container py-8 flex items-center justify-between text-sm text-muted-foreground">
           <span className="font-display">Question Node</span>
           <span>Built for clarity.</span>

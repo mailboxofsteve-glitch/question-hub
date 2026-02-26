@@ -65,6 +65,14 @@ const AppLayout = ({ children }: AppLayoutProps) => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {/* Skip to main content */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-md focus:bg-accent focus:text-accent-foreground focus:font-medium focus:text-sm"
+      >
+        Skip to main content
+      </a>
+
       <header className="border-b border-border" role="banner">
         <div className="container flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2" aria-label="Home">
@@ -138,7 +146,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           </div>
         </div>
       </header>
-      <main className="flex-1">{children}</main>
+      <main id="main-content" className="flex-1" tabIndex={-1}>{children}</main>
     </div>
   );
 };
