@@ -26,10 +26,21 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export function useNodeSearch() {
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  // Debounce query by 300ms
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [query]);
+
   const searchResults = useQuery<SearchResponse>({
-    queryKey: ['node-search', query, selectedCategory],
+    queryKey: ['node-search', debouncedQuery, selectedCategory],
     queryFn: async () => {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/api-answer`, {
         method: 'POST',
@@ -38,9 +49,9 @@ export function useNodeSearch() {
           'apikey': SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          query: query.trim(),
+          query: debouncedQuery.trim(),
           category: selectedCategory,
-          limit: selectedCategory && !query.trim() ? 50 : 5,
+          limit: selectedCategory && !debouncedQuery.trim() ? 50 : 5,
         }),
       });
 
@@ -51,7 +62,7 @@ export function useNodeSearch() {
 
       return await res.json();
     },
-    enabled: query.trim().length > 0 || selectedCategory !== null,
+    enabled: debouncedQuery.trim().length > 0 || selectedCategory !== null,
   });
 
   // Track search events (debounced)
