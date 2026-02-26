@@ -93,6 +93,42 @@ const WriterGuideDialog = () => (
             <p>Toggle <strong>Published</strong> when the node is ready for users. Unpublished nodes are saved as <em>Drafts</em> and won't appear in search results.</p>
           </section>
 
+          {/* Roles & Permissions */}
+          <section>
+            <h3 className="font-semibold text-base mb-2">8. Roles &amp; Permissions</h3>
+
+            <div className="space-y-3">
+              <div>
+                <p className="font-medium mb-1">Admin</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Can <strong>create</strong> new nodes (saved as Draft).</li>
+                  <li>Can <strong>edit only nodes they created</strong>. The edit button is hidden for nodes submitted by others.</li>
+                  <li>Any edit by an admin <strong>automatically reverts</strong> the node to <em>Draft</em> status, requiring editor review before republication.</li>
+                  <li><strong>Cannot delete</strong> any nodes.</li>
+                  <li><strong>Cannot publish</strong> or change publication status.</li>
+                </ul>
+              </div>
+
+              <div>
+                <p className="font-medium mb-1">Editor</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Full permissions — can <strong>create, edit, and delete</strong> any node regardless of who submitted it.</li>
+                  <li>Only editors can <strong>publish</strong> nodes or toggle publication status.</li>
+                  <li>Can re-publish nodes that were reverted to draft by an admin edit.</li>
+                </ul>
+              </div>
+
+              <div className="mt-3 p-3 rounded bg-muted/50">
+                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-2">Typical Workflow</p>
+                <ol className="list-decimal pl-5 space-y-1">
+                  <li><strong>Admin</strong> creates or edits a node — it is saved as a <em>Draft</em>.</li>
+                  <li><strong>Editor</strong> reviews the draft for accuracy and completeness.</li>
+                  <li><strong>Editor</strong> publishes the node (or requests changes from the admin).</li>
+                </ol>
+              </div>
+            </div>
+          </section>
+
         </div>
       </ScrollArea>
     </DialogContent>
