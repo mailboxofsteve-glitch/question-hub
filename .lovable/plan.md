@@ -1,56 +1,18 @@
 
 
-## Restrict Admin Edits to Own Nodes & Auto-Draft on Edit
+## Update Writer's Guide with Permissions & Workflow
 
-### Overview
-Admins will only be able to edit nodes they created. When an admin edits a node, it will automatically revert to "Draft" status. Editors retain full permissions unchanged.
+### Change
 
-### Changes
+Add a new section **8. Roles & Permissions** to the Writer's Guide dialog, placed after the existing "Publishing" section. This section will explain:
 
-**1. Edge Function — `supabase/functions/admin-nodes/index.ts`**
+- **Admin role**: Can create new nodes and edit only their own submissions. Any edit by an admin automatically reverts the node to "Draft" status, requiring editor review before republication. Admins cannot edit nodes created by other users and cannot delete any nodes.
+- **Editor role**: Full permissions — can create, edit, and delete any node regardless of who submitted it. Editors are the only role that can publish nodes or toggle publication status. Editors can also re-publish nodes that were reverted to draft by an admin edit.
+- **Workflow summary**: A concise step-by-step describing the typical process: (1) Admin creates/edits a node (saved as draft), (2) Editor reviews the draft, (3) Editor publishes or requests changes.
 
-In the `PUT` handler, after fetching the existing node:
-- If the user is an admin (not editor), check that `existing.created_by === userId`. If not, return `403 Forbidden`.
-- If the user is an admin (not editor), force `updateData.published = false` regardless of what was sent.
-
-```typescript
-// After fetching existing node...
-if (!isEditor) {
-  // Admin can only edit their own nodes
-  const { data: fullNode } = await supabase
-    .from("nodes").select("created_by").eq("id", nodeId).single();
-  if (fullNode?.created_by !== userId) {
-    return json({ error: "Forbidden: you can only edit nodes you created" }, 403);
-  }
-  // Auto-revert to draft on admin edit
-  updateData.published = false;
-}
-```
-
-**2. Frontend — `src/components/admin/AdminDashboard.tsx`**
-
-- Pass `session.user.id` to determine ownership on the client side.
-- Hide the edit (pencil) button for admin users on nodes they did not create (`created_by` !== current user id).
-- Show a visual indicator (e.g., tooltip or disabled state) so admins understand why they can't edit certain nodes.
-
-The edit button condition changes from always-visible to:
-```tsx
-{(isEditor || (node as any).created_by === session.user.id) && (
-  <Button variant="ghost" size="icon" onClick={...}>
-    <Pencil />
-  </Button>
-)}
-```
-
-### Files Changed
+### File Changed
 
 | File | Change |
 |---|---|
-| `supabase/functions/admin-nodes/index.ts` | PUT: ownership check for admins, auto-set `published = false` for admin edits |
-| `src/components/admin/AdminDashboard.tsx` | Hide edit button for admins on nodes they didn't create |
-
-### Notes
-- The server-side check is the authoritative enforcement; the frontend change is UX only.
-- Editors are completely unaffected — they keep all existing permissions.
-- When an admin edits their own node, the node reverts to draft so an editor must re-publish it.
+| `src/components/admin/WriterGuideDialog.tsx` | Add section 8 with roles, permissions table, and workflow after the existing "Publishing" section |
 
