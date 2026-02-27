@@ -53,6 +53,8 @@ export type Database = {
           layer3_json: Json | null
           published: boolean
           search_blob: string | null
+          spine_gates: Json
+          tier: number | null
           title: string
           updated_at: string
         }
@@ -67,6 +69,8 @@ export type Database = {
           layer3_json?: Json | null
           published?: boolean
           search_blob?: string | null
+          spine_gates?: Json
+          tier?: number | null
           title: string
           updated_at?: string
         }
@@ -81,6 +85,8 @@ export type Database = {
           layer3_json?: Json | null
           published?: boolean
           search_blob?: string | null
+          spine_gates?: Json
+          tier?: number | null
           title?: string
           updated_at?: string
         }
