@@ -193,8 +193,9 @@ const AdminDashboard = ({ session, isEditor = false }: AdminDashboardProps) => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Title</TableHead>
+                     <TableHead>ID</TableHead>
+                     <TableHead>Title</TableHead>
+                     <TableHead>Tier</TableHead>
                      <TableHead>Category</TableHead>
                      <TableHead>Submitted By</TableHead>
                      <TableHead>Status</TableHead>
@@ -206,8 +207,9 @@ const AdminDashboard = ({ session, isEditor = false }: AdminDashboardProps) => {
                   {filteredNodes.map((node) => (
                     <TableRow key={node.id}>
                       <TableCell className="font-mono text-xs">{node.id}</TableCell>
-                      <TableCell className="font-medium">{node.title}</TableCell>
-                      <TableCell>{node.category ?? '—'}</TableCell>
+                       <TableCell className="font-medium">{node.title}</TableCell>
+                       <TableCell className="text-xs">{(node as any).tier ?? '—'}</TableCell>
+                       <TableCell>{node.category ?? '—'}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {(node as any).created_by_email ?? '—'}
                       </TableCell>

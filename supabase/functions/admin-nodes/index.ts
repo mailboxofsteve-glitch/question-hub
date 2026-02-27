@@ -21,7 +21,10 @@ function buildSearchBlob(data: Record<string, unknown>): string {
   const altPhrasings = Array.isArray(data.alt_phrasings)
     ? (data.alt_phrasings as string[]).join(" ")
     : "";
-  return [title, layer1, keywords, altPhrasings].filter(Boolean).join(" ");
+  const spineGates = Array.isArray(data.spine_gates)
+    ? (data.spine_gates as string[]).join(" ")
+    : "";
+  return [title, layer1, keywords, altPhrasings, spineGates].filter(Boolean).join(" ");
 }
 
 Deno.serve(async (req) => {
@@ -128,6 +131,8 @@ Deno.serve(async (req) => {
           layer1: body.layer1 ?? null,
           layer2_json: body.layer2_json ?? {},
           layer3_json: body.layer3_json ?? {},
+          tier: body.tier ?? null,
+          spine_gates: body.spine_gates ?? [],
           published: isEditor ? (body.published ?? false) : false,
           search_blob: "",
           created_by: userId,
@@ -149,6 +154,8 @@ Deno.serve(async (req) => {
         if ("layer1" in body) updateData.layer1 = body.layer1;
         if ("layer2_json" in body) updateData.layer2_json = body.layer2_json;
         if ("layer3_json" in body) updateData.layer3_json = body.layer3_json;
+        if ("tier" in body) updateData.tier = body.tier;
+        if ("spine_gates" in body) updateData.spine_gates = body.spine_gates;
         if ("published" in body && isEditor) updateData.published = body.published;
 
         if (Object.keys(updateData).length === 0) {
