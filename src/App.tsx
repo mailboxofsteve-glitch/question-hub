@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import NodePreview from "./pages/NodePreview";
+import SpineMap from "./pages/SpineMap";
 import RouteAnnouncer from "./components/RouteAnnouncer";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/node/:id/preview" element={<NodePreview />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/graph" element={<SpineMap />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
