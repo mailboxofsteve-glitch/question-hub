@@ -1,66 +1,70 @@
 
 
-## Accessibility Improvements for Blind Users
+## Plan: Create 193 Spine Map Placeholder Nodes
 
-All of these are free — they use built-in HTML semantics and ARIA attributes with zero dependencies.
-
----
-
-### 1. Skip Navigation Link
-**File**: `src/components/layout/AppLayout.tsx`
-
-Add a visually hidden "Skip to main content" link as the first child of the layout. On focus (Tab), it becomes visible and jumps past the header to `<main id="main-content">`.
-
-### 2. Landmark Roles & Live Regions
-**Files**: `src/pages/Index.tsx`, `src/pages/NodeDetail.tsx`, `src/components/layout/AppLayout.tsx`
-
-- Add `id="main-content"` to `<main>` for skip-nav target
-- Add `role="contentinfo"` to the footer in `Index.tsx`
-- Add `aria-live="polite"` to search results count so screen readers announce result changes
-- Add `aria-busy` to the search results container while loading
-
-### 3. Heading Hierarchy Audit
-**Files**: `src/pages/Index.tsx`, `src/pages/NodeDetail.tsx`
-
-- Ensure headings follow a strict `h1 > h2 > h3` hierarchy (no skipped levels)
-- Add visually hidden headings where sections lack them (e.g., "Search Results", "Features")
-
-### 4. Focus Management
-**Files**: `src/pages/NodeDetail.tsx`, `src/pages/Index.tsx`
-
-- Add `tabIndex={-1}` and auto-focus to the `<h1>` on NodeDetail page load so screen readers announce the new page
-- Add visible focus outlines via a global CSS rule (`focus-visible`) for all interactive elements
-
-### 5. Improved Image & Icon Alt Text
-**Files**: `src/pages/NodeDetail.tsx`, `src/components/layout/AppLayout.tsx`
-
-- Add `aria-hidden="true"` to all decorative icons (ChevronRight, decorative dots, etc.)
-- Ensure reasoning bullet images have descriptive `alt` text (already uses `bullet.title`)
-- Add `alt=""` to purely decorative images
-- Add `title` attribute to iframes for embedded videos
-
-### 6. Announce Route Changes
-**File**: `src/App.tsx` or new `src/components/RouteAnnouncer.tsx`
-
-Create a visually hidden live region that announces page title changes on route navigation, so screen readers inform users they've moved to a new page.
-
-### 7. Form & Interactive Element Labels
-**Files**: `src/pages/Index.tsx`, `src/components/layout/AppLayout.tsx`
-
-- Wrap category buttons with descriptive `aria-label` (e.g., `aria-label="Browse category: Theology"`)
-- Add `aria-expanded` to the Reasoning collapsible trigger
-- Add `aria-label` to the "Clear" search results button
+### Overview
+Add two new metadata columns to the `nodes` table, then bulk-insert all 25 spine gates and 168 branch nodes as unpublished draft placeholders visible in the admin dashboard.
 
 ---
 
-### Summary of Files
+### Step 1 — Database Migration: Add `tier` and `spine_gates` columns
 
-| File | Changes |
+Add to the `nodes` table:
+- `tier` (integer, nullable) — 0 through 6
+- `spine_gates` (jsonb, default `'[]'`) — array of gate IDs like `["S-01","S-04"]`
+
+This lets each node carry its spine architecture metadata without overloading `category` or `keywords`.
+
+---
+
+### Step 2 — Bulk-Insert All 193 Placeholder Nodes
+
+Use direct SQL inserts to create all nodes as unpublished drafts:
+
+**25 Spine Gate nodes** (e.g.):
+- `id`: `s-01` through `s-25`
+- `title`: The gate question (e.g. "Does truth exist, or is everything just perspective?")
+- `category`: Tier label (e.g. "Tier 0 — Epistemological Bedrock")
+- `tier`: 0–6
+- `spine_gates`: `[]` (gates are roots, not branches)
+- `published`: false
+
+**168 Branch nodes** (e.g.):
+- `id`: slug derived from question (e.g. `q42-moral-intuitions-brain-chemistry`)
+- `title`: The full question text
+- `category`: Tier label
+- `tier`: corresponding tier number
+- `spine_gates`: array of parent gates (e.g. `["S-04","S-16"]`)
+- `keywords`: spine gate references as text for search
+- `published`: false
+
+All layer1, layer2_json, layer3_json fields left empty — these are placeholders for future content writing.
+
+---
+
+### Step 3 — Update Admin Dashboard & Edge Function
+
+- Update the `admin-nodes` edge function to handle the new `tier` and `spine_gates` fields on create/update
+- Update the `NodeForm` component to display tier and spine gates fields (read-only or editable)
+- Update the admin table to show a "Tier" column and optionally a "Gate" column
+- Update the Supabase types (automatic after migration)
+
+---
+
+### Step 4 — Update NodeDetail & Search
+
+- Include `tier` and `spine_gates` in the node detail breadcrumb (show tier name)
+- Include `spine_gates` in the `search_blob` builder so gates are searchable
+
+---
+
+### Files Changed
+
+| File | Change |
 |---|---|
-| `src/components/layout/AppLayout.tsx` | Skip-nav link, `id="main-content"` on `<main>`, decorative icon `aria-hidden` |
-| `src/pages/Index.tsx` | `aria-live` on results, `aria-busy`, hidden section headings, category button labels, footer role |
-| `src/pages/NodeDetail.tsx` | Focus `h1` on load, iframe `title`, `aria-hidden` on decorative icons |
-| `src/components/RouteAnnouncer.tsx` | New component — visually hidden live region announcing page changes |
-| `src/App.tsx` | Include `RouteAnnouncer` |
-| `src/index.css` | Global `focus-visible` outline style |
+| Database migration | Add `tier` int + `spine_gates` jsonb columns |
+| Database insert | 193 INSERT statements for all placeholder nodes |
+| `supabase/functions/admin-nodes/index.ts` | Handle `tier` and `spine_gates` in POST/PUT |
+| `src/components/admin/NodeForm.tsx` | Add tier + spine_gates display/edit fields |
+| `src/components/admin/AdminDashboard.tsx` | Add Tier column to table |
 
