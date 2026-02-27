@@ -51,6 +51,10 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
   const [layer3Data, setLayer3Data] = useState<Layer3Data>(
     deserializeLayer3(node?.layer3_json)
   );
+  const [tier, setTier] = useState<number | null>((node as any)?.tier ?? null);
+  const [spineGates, setSpineGates] = useState<string[]>(
+    Array.isArray((node as any)?.spine_gates) ? (node as any).spine_gates : []
+  );
   const [published, setPublished] = useState(node?.published ?? false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -75,8 +79,10 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
       layer1: layer1.trim() || null,
       layer2_json: serializeLayer2(layer2Bullets) as unknown as Node['layer2_json'],
       layer3_json: serializeLayer3(layer3Data) as unknown as Node['layer3_json'],
+      tier,
+      spine_gates: spineGates,
       published,
-    });
+    } as any);
   };
 
   const handleDownload = () => {
@@ -167,6 +173,31 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
           </div>
 
           <AltPhrasingsField phrasings={altPhrasings} onChange={setAltPhrasings} />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="tier">Tier</Label>
+              <Input
+                id="tier"
+                type="number"
+                min={0}
+                max={6}
+                value={tier ?? ''}
+                onChange={(e) => setTier(e.target.value === '' ? null : parseInt(e.target.value))}
+                placeholder="0–6"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="spine-gates">Spine Gates</Label>
+              <Input
+                id="spine-gates"
+                value={spineGates.join(', ')}
+                onChange={(e) => setSpineGates(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                placeholder='e.g. S-04, S-16'
+              />
+              <p className="text-xs text-muted-foreground">Comma-separated gate IDs</p>
+            </div>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="layer1">Layer 1 — Summary</Label>
