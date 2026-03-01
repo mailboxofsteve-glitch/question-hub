@@ -1,39 +1,29 @@
 
 
-## Spine Map: Vertical Stacked Tier Layout
+## Spine Map: Tooltip Fix + Printable Version
 
-### Current Problem
-The graph uses a force-directed simulation where nodes float freely with only a weak `forceY` pulling them toward tier bands. This creates a scattered, organic layout rather than the structured "spine" format with clear horizontal tier rows stacked vertically.
+### Issue 1: Tooltips not showing correctly
 
-### Proposed Changes (single file: `src/pages/SpineMap.tsx`)
+The tooltip uses raw SVG coordinates (`d.x`, `d.y`) for positioning, but these don't account for the D3 zoom/pan transform applied to the `<g>` group. When the user zooms or pans, tooltips appear at incorrect positions (or off-screen), making them seem like they don't work for many nodes.
 
-**Replace the force-directed D3 simulation with a deterministic, structured layout:**
+**Fix**: Capture the current zoom transform and apply it to the tooltip coordinates. Use `d3.zoomTransform(svgRef.current)` to convert SVG-space coordinates to screen-space coordinates before positioning the tooltip div.
 
-1. **Invert tier order** -- Tier 0 at the bottom, Tier 6 at the top (lower to higher, bottom to top).
+### Issue 2: Printable Version
 
-2. **Render each tier as a distinct horizontal row/band** with:
-   - A colored background strip spanning the full width
-   - A tier label on the left side (e.g., "T0: Epistemological Bedrock")
-   - Spine gate circles arranged in a row within each band
-   - Branch nodes rendered as smaller dots clustered around their parent gate
+Add a "Print View" button that toggles between the interactive SVG map and a clean, printer-friendly HTML listing of all nodes organized by tier.
 
-3. **Layout approach**: Drop D3 force simulation entirely. Instead, compute fixed x/y positions:
-   - Each tier gets a fixed y-band (height divided into 7 rows, bottom-up)
-   - Gates within a tier are evenly spaced horizontally
-   - Branch nodes are positioned in a small arc or cluster around their parent gate
+**Print view layout**:
+- Grouped by tier (T0–T6), each with its label and color accent
+- Under each tier, spine gates listed as subheadings
+- Branch nodes listed under their parent gate with titles
+- Uses `@media print` CSS to hide the interactive map, navigation, and legend
+- A "Print" button triggers `window.print()`
 
-4. **Keep existing interactivity**: zoom/pan via D3 zoom, hover tooltips, click-to-navigate on branches, and dragging.
+### Changes (single file: `src/pages/SpineMap.tsx`)
 
-5. **Draw vertical "spine" connector lines** between adjacent tier bands to reinforce the stacked structure.
-
-6. **Keep links** from gates to their branch nodes as subtle curved lines.
-
-### Technical Details
-
-- Replace `forceSimulation` with a manual position calculator that assigns `x, y` to each node based on tier index and gate index within that tier
-- Use `d3.zoom` on the SVG for pan/zoom (same as current)
-- Render tier background rectangles as `<rect>` elements behind the nodes
-- Render a vertical center line ("the spine") connecting tier bands
-- Keep drag behavior but constrain it to not disrupt the overall layout structure (optional: remove drag entirely for cleaner UX)
-- SVG height should be taller to accommodate 7 stacked rows (~1200px or dynamic based on node count)
+1. Store the current D3 zoom transform in a ref; update it in the zoom handler
+2. In `mouseover`, apply the transform to `d.x`/`d.y` before setting tooltip state
+3. Add a `showPrintView` state toggle
+4. When active, render an HTML list (tier → gates → branches) instead of the SVG, with a print button
+5. Add `print:` Tailwind variants to hide nav/legend in print mode
 
