@@ -247,8 +247,8 @@ export default function SpineMap() {
       return aNum - bNum;
     });
 
-    // ── 2b. Collect and position branch nodes ──
-    type BranchNode = PosNode & { parentX: number; parentY: number };
+    // ── 2b. Collect and position branch nodes (deduplicated) ──
+    type BranchNode = PosNode & { parents: { x: number; y: number }[] };
     const branchNodes: BranchNode[] = [];
     const spineIdSet = new Set(spineNodesMap.keys());
 
@@ -256,41 +256,43 @@ export default function SpineMap() {
     const spinePosById = new globalThis.Map<string, PosNode>();
     spinePositioned.forEach((p) => spinePosById.set(p.id.toLowerCase(), p));
 
-    // Group branches per spine gate
-    const branchesPerGate = new globalThis.Map<string, NodeRecord[]>();
-    nodes.forEach((n) => {
-      if (spineIdSet.has(n.id.toLowerCase())) return;
-      const gates = Array.isArray(n.spine_gates) ? n.spine_gates : [];
-      gates.forEach((g: string) => {
-        const key = g.toLowerCase();
-        if (spinePosById.has(key)) {
-          if (!branchesPerGate.has(key)) branchesPerGate.set(key, []);
-          branchesPerGate.get(key)!.push(n);
-        }
-      });
-    });
+    // Iterate non-spine nodes once, collect all parent positions
+    const branchCandidates = nodes.filter((n) => !spineIdSet.has(n.id.toLowerCase()));
+    // Group by first parent gate for positioning index
+    const gateChildCount = new globalThis.Map<string, number>();
 
-    branchesPerGate.forEach((branches, gateKey) => {
-      const parent = spinePosById.get(gateKey)!;
-      branches.sort((a, b) => a.title.localeCompare(b.title));
-      branches.forEach((b, i) => {
-        const side = i % 2 === 0 ? -1 : 1;
-        const col = Math.floor(i / 2);
-        const xOffset = (col + 1) * 110 * side;
-        const yJitter = (i % 3 - 1) * 18;
-        branchNodes.push({
-          id: b.id,
-          label: b.title,
-          x: parent.x + xOffset,
-          y: parent.y + yJitter,
-          tier: b.tier ?? parent.tier,
-          isSpine: false,
-          radius: 13,
-          color: TIER_COLORS[b.tier ?? parent.tier] ?? "hsl(0, 0%, 50%)",
-          navigateId: b.id,
-          parentX: parent.x,
-          parentY: parent.y,
-        });
+    branchCandidates.forEach((b) => {
+      const gates = Array.isArray(b.spine_gates) ? b.spine_gates : [];
+      const parents: { x: number; y: number }[] = [];
+      gates.forEach((g: string) => {
+        const pos = spinePosById.get(g.toLowerCase());
+        if (pos) parents.push({ x: pos.x, y: pos.y });
+      });
+      if (parents.length === 0) return;
+
+      // Position relative to first parent
+      const firstGateKey = gates[0].toLowerCase();
+      const idx = gateChildCount.get(firstGateKey) ?? 0;
+      gateChildCount.set(firstGateKey, idx + 1);
+
+      const firstParent = parents[0];
+      const side = idx % 2 === 0 ? -1 : 1;
+      const col = Math.floor(idx / 2);
+      const xOffset = (col + 1) * 110 * side;
+      const yJitter = (idx % 3 - 1) * 18;
+
+      const parentPos = spinePosById.get(firstGateKey)!;
+      branchNodes.push({
+        id: b.id,
+        label: b.title,
+        x: parentPos.x + xOffset,
+        y: parentPos.y + yJitter,
+        tier: b.tier ?? parentPos.tier,
+        isSpine: false,
+        radius: 13,
+        color: TIER_COLORS[b.tier ?? parentPos.tier] ?? "hsl(0, 0%, 50%)",
+        navigateId: b.id,
+        parents,
       });
     });
 
@@ -337,15 +339,17 @@ export default function SpineMap() {
         .attr("stroke-opacity", 0.25);
     }
 
-    // ── Branch connection lines ──
+    // ── Branch connection lines (one per parent) ──
     branchNodes.forEach((bn) => {
-      g.append("line")
-        .attr("x1", bn.parentX).attr("y1", bn.parentY)
-        .attr("x2", bn.x).attr("y2", bn.y)
-        .attr("stroke", bn.color)
-        .attr("stroke-width", 1.2)
-        .attr("stroke-opacity", 0.35)
-        .attr("stroke-dasharray", "4 3");
+      bn.parents.forEach((parent) => {
+        g.append("line")
+          .attr("x1", parent.x).attr("y1", parent.y)
+          .attr("x2", bn.x).attr("y2", bn.y)
+          .attr("stroke", bn.color)
+          .attr("stroke-width", 1.2)
+          .attr("stroke-opacity", 0.35)
+          .attr("stroke-dasharray", "4 3");
+      });
     });
 
     // ── Branch node circles ──
