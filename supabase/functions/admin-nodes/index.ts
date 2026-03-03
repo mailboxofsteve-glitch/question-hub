@@ -169,9 +169,14 @@ Deno.serve(async (req) => {
           .single();
         if (fetchErr) return json({ error: fetchErr.message }, 400);
 
-        // Admin (non-editor) can only edit their own nodes, and edits revert to draft
+        // Claim ownership if node is unowned
+        if (existing.created_by === null) {
+          updateData.created_by = userId;
+        }
+
+        // Admin (non-editor) can only edit their own nodes or unowned nodes, and edits revert to draft
         if (!isEditor) {
-          if (existing.created_by !== userId) {
+          if (existing.created_by !== null && existing.created_by !== userId) {
             return json({ error: "Forbidden: you can only edit nodes you created" }, 403);
           }
           updateData.published = false;
