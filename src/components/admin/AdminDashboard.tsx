@@ -9,7 +9,8 @@ import { adminFetch } from '@/hooks/use-admin';
 import { Tables } from '@/integrations/supabase/types';
 import { toast } from '@/hooks/use-toast';
 import NodeForm from './NodeForm';
-import { Plus, Pencil, Trash2, LogOut, ArrowLeft, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, LogOut, ArrowLeft, Eye, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { Link } from 'react-router-dom';
 import ImportNodeDialog from './ImportNodeDialog';
 import ImportCsvDialog from './ImportCsvDialog';
@@ -35,6 +36,11 @@ const AdminDashboard = ({ session, isEditor = false }: AdminDashboardProps) => {
   const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
   const [editingNode, setEditingNode] = useState<Node | null>(null);
   const [tab, setTab] = useState('all');
+
+  type SortColumn = 'id' | 'title' | 'tier' | 'category' | 'created_by_email' | 'published' | 'updated_at';
+  const [sortColumn, setSortColumn] = useState<SortColumn>('id');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [filters, setFilters] = useState<Record<string, string>>({});
 
   const fetchNodes = useCallback(async () => {
     setLoading(true);
@@ -103,11 +109,51 @@ const AdminDashboard = ({ session, isEditor = false }: AdminDashboardProps) => {
     }
   };
 
-  const filteredNodes = nodes.filter((n) => {
-    if (tab === 'published') return n.published;
-    if (tab === 'drafts') return !n.published;
-    return true;
-  });
+  const toggleSort = (col: SortColumn) => {
+    if (sortColumn === col) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortColumn(col); setSortDirection('asc'); }
+  };
+
+  const SortIcon = ({ col }: { col: SortColumn }) => {
+    if (sortColumn !== col) return <ArrowUpDown className="w-3 h-3 ml-1 inline opacity-40" />;
+    return sortDirection === 'asc'
+      ? <ArrowUp className="w-3 h-3 ml-1 inline" />
+      : <ArrowDown className="w-3 h-3 ml-1 inline" />;
+  };
+
+  const setFilter = (key: string, value: string) =>
+    setFilters(f => ({ ...f, [key]: value }));
+
+  const filteredNodes = nodes
+    .filter((n) => {
+      if (tab === 'published') return n.published;
+      if (tab === 'drafts') return !n.published;
+      return true;
+    })
+    .filter((n) => {
+      const f = filters;
+      const match = (val: string | null | undefined, q: string) =>
+        !q || (val ?? '').toLowerCase().includes(q.toLowerCase());
+      return (
+        match(n.id, f.id ?? '') &&
+        match(n.title, f.title ?? '') &&
+        match(String((n as any).tier ?? ''), f.tier ?? '') &&
+        match(n.category, f.category ?? '') &&
+        match((n as any).created_by_email, f.created_by_email ?? '')
+      );
+    })
+    .sort((a, b) => {
+      const dir = sortDirection === 'asc' ? 1 : -1;
+      const col = sortColumn;
+      let aVal: any, bVal: any;
+      if (col === 'published') { aVal = a.published ? 1 : 0; bVal = b.published ? 1 : 0; }
+      else if (col === 'tier') { aVal = (a as any).tier ?? 0; bVal = (b as any).tier ?? 0; }
+      else if (col === 'updated_at') { aVal = a.updated_at; bVal = b.updated_at; }
+      else if (col === 'created_by_email') { aVal = (a as any).created_by_email ?? ''; bVal = (b as any).created_by_email ?? ''; }
+      else { aVal = (a as any)[col] ?? ''; bVal = (b as any)[col] ?? ''; }
+      if (typeof aVal === 'string') return dir * aVal.localeCompare(bVal);
+      return dir * (aVal - bVal);
+    });
 
   if (view === 'create') {
     return (
@@ -193,13 +239,21 @@ const AdminDashboard = ({ session, isEditor = false }: AdminDashboardProps) => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                     <TableHead>ID</TableHead>
-                     <TableHead>Title</TableHead>
-                     <TableHead>Tier</TableHead>
-                     <TableHead>Category</TableHead>
-                     <TableHead>Submitted By</TableHead>
-                     <TableHead>Status</TableHead>
-                     <TableHead>Updated</TableHead>
+                    {([['id','ID'],['title','Title'],['tier','Tier'],['category','Category'],['created_by_email','Submitted By'],['published','Status'],['updated_at','Updated']] as [SortColumn, string][]).map(([col, label]) => (
+                      <TableHead key={col}>
+                        <button type="button" onClick={() => toggleSort(col)} className="flex items-center gap-0.5 hover:text-foreground transition-colors font-medium">
+                          {label}<SortIcon col={col} />
+                        </button>
+                        {!['published','updated_at'].includes(col) && (
+                          <Input
+                            placeholder="Filter…"
+                            value={filters[col] ?? ''}
+                            onChange={e => setFilter(col, e.target.value)}
+                            className="mt-1 h-6 text-xs px-1"
+                          />
+                        )}
+                      </TableHead>
+                    ))}
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
