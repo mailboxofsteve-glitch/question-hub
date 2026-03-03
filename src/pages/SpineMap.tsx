@@ -216,21 +216,35 @@ export default function SpineMap() {
     const spineX = contentWidth / 2;
     const spineCount = spineNodesList.length;
 
-    // Bottom of T0 band to top of T6 band
-    const spineBottomY = tierBandY(0) + BAND_HEIGHT - 30;
-    const spineTopY = tierBandY(6) + 30;
-
-    spineNodesList.forEach((node, i) => {
-      const y = spineCount === 1
-        ? (spineBottomY + spineTopY) / 2
-        : spineBottomY - (spineBottomY - spineTopY) * (i / (spineCount - 1));
+    // Group spine nodes by tier, then position within each tier's band
+    const spineByTier = new globalThis.Map<number, typeof spineNodesList>();
+    spineNodesList.forEach((node) => {
       const tier = node.tier ?? 0;
-      posNodes.push({
-        id: node.id, label: node.title, x: spineX, y,
-        tier, isSpine: true, radius: 28,
-        color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)",
-        navigateId: node.id,
+      if (!spineByTier.has(tier)) spineByTier.set(tier, []);
+      spineByTier.get(tier)!.push(node);
+    });
+
+    spineByTier.forEach((tierNodes, tier) => {
+      const bandTop = tierBandY(tier) + 30;
+      const bandBottom = tierBandY(tier) + BAND_HEIGHT - 30;
+      tierNodes.forEach((node, i) => {
+        const y = tierNodes.length === 1
+          ? (bandTop + bandBottom) / 2
+          : bandBottom - (bandBottom - bandTop) * (i / (tierNodes.length - 1));
+        posNodes.push({
+          id: node.id, label: node.title, x: spineX, y,
+          tier, isSpine: true, radius: 28,
+          color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)",
+          navigateId: node.id,
+        });
       });
+    });
+
+    // Re-sort posNodes by spine number for chain lines
+    posNodes.sort((a, b) => {
+      const aNum = parseInt(a.id.match(/s-(\d+)/i)![1]);
+      const bNum = parseInt(b.id.match(/s-(\d+)/i)![1]);
+      return aNum - bNum;
     });
 
     // ── 3. Render ──
