@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import * as d3 from "d3";
-import { Printer, Map } from "lucide-react";
+import { Printer, Map, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface NodeRecord {
   id: string;
@@ -46,6 +47,12 @@ const TIER_LABELS: Record<number, string> = {
   6: "Testing the Bible",
 };
 
+const BAND_HEIGHT_EXPANDED = 180;
+const BAND_HEIGHT_COLLAPSED = 44;
+const PADDING_TOP = 40;
+const PADDING_BOTTOM = 40;
+const TIER_COUNT = 7;
+
 // ── Printable View Component ──────────────────────────────────────
 function PrintView({
   nodes,
@@ -53,8 +60,8 @@ function PrintView({
   branchesByGate,
 }: {
   nodes: NodeRecord[];
-  gatesByTier: Map<number, string[]>;
-  branchesByGate: Map<string, NodeRecord[]>;
+  gatesByTier: globalThis.Map<number, string[]>;
+  branchesByGate: globalThis.Map<string, NodeRecord[]>;
 }) {
   return (
     <div className="print-view space-y-6">
@@ -102,7 +109,18 @@ export default function SpineMap() {
   const zoomTransformRef = useRef(d3.zoomIdentity);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const [showPrintView, setShowPrintView] = useState(false);
+  const [collapsedTiers, setCollapsedTiers] = useState<Set<number>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
+
+  const toggleTier = useCallback((tier: number) => {
+    setCollapsedTiers((prev) => {
+      const next = new Set(prev);
+      if (next.has(tier)) next.delete(tier);
+      else next.add(tier);
+      return next;
+    });
+  }, []);
 
   const { data: nodes, isLoading } = useQuery({
     queryKey: ["spine-map-nodes"],
@@ -119,9 +137,13 @@ export default function SpineMap() {
   });
 
   // Precompute gate groupings for both views
-  const { gatesByTier, branchesByGate, gateToTitle } = useMemo(() => {
+  const { gatesByTier, branchesByGate, branchCountBySpine } = useMemo(() => {
     if (!nodes) {
-      return { gatesByTier: new globalThis.Map(), branchesByGate: new globalThis.Map() };
+      return {
+        gatesByTier: new globalThis.Map<number, string[]>(),
+        branchesByGate: new globalThis.Map<string, NodeRecord[]>(),
+        branchCountBySpine: new globalThis.Map<string, number>(),
+      };
     }
 
     const gateSet = new Set<string>();
@@ -160,37 +182,63 @@ export default function SpineMap() {
 
     const byGate = new globalThis.Map<string, NodeRecord[]>();
     gateSet.forEach((g) => byGate.set(g, []));
+
+    const spinePattern = /^s-(\d+)$/i;
+    const spineIdSet = new Set<string>();
     nodes.forEach((n) => {
+      if (spinePattern.test(n.id)) spineIdSet.add(n.id.toLowerCase());
+    });
+
+    // Count branch nodes per spine gate
+    const countBySpine = new globalThis.Map<string, number>();
+    nodes.forEach((n) => {
+      if (spineIdSet.has(n.id.toLowerCase())) return; // skip spine nodes themselves
       const gates = Array.isArray(n.spine_gates) ? n.spine_gates : [];
       gates.forEach((g: string) => {
         if (byGate.has(g)) byGate.get(g)!.push(n);
+        const key = g.toLowerCase();
+        if (spineIdSet.has(key)) {
+          countBySpine.set(key, (countBySpine.get(key) ?? 0) + 1);
+        }
       });
     });
 
-    // Build gate-to-title lookup: match gate name (e.g. "S-01") to node title
-    const gateToTitle = new globalThis.Map<string, string>();
-    gateSet.forEach((gate) => {
-      const match = nodes.find((n) => n.id.toLowerCase() === gate.toLowerCase());
-      if (match) gateToTitle.set(gate, match.title);
-    });
-
-    return { gatesByTier: byTier, branchesByGate: byGate, gateToTitle };
+    return { gatesByTier: byTier, branchesByGate: byGate, branchCountBySpine: countBySpine };
   }, [nodes]);
+
+  // Search matching set
+  const matchingIds = useMemo(() => {
+    if (!searchQuery.trim() || !nodes) return null; // null = no filter
+    const q = searchQuery.toLowerCase();
+    const ids = new Set<string>();
+    nodes.forEach((n) => {
+      if (n.title.toLowerCase().includes(q) || n.id.toLowerCase().includes(q)) {
+        ids.add(n.id.toLowerCase());
+      }
+    });
+    return ids;
+  }, [searchQuery, nodes]);
 
   useEffect(() => {
     if (!nodes || !svgRef.current || !containerRef.current || showPrintView) return;
 
     const containerWidth = containerRef.current.clientWidth;
-    const TIER_COUNT = 7;
-    const BAND_HEIGHT = 180;
-    const PADDING_TOP = 40;
-    const PADDING_BOTTOM = 40;
-    const totalHeight = PADDING_TOP + TIER_COUNT * BAND_HEIGHT + PADDING_BOTTOM;
     const contentWidth = Math.max(containerWidth, 900);
+
+    // Dynamic band height based on collapsed state
+    const bandHeight = (tier: number) =>
+      collapsedTiers.has(tier) ? BAND_HEIGHT_COLLAPSED : BAND_HEIGHT_EXPANDED;
+
+    const totalHeight = PADDING_TOP + Array.from({ length: TIER_COUNT }, (_, i) => bandHeight(i)).reduce((a, b) => a + b, 0) + PADDING_BOTTOM;
 
     const tierBandY = (tier: number) => {
       const invertedIndex = (TIER_COUNT - 1) - tier;
-      return PADDING_TOP + invertedIndex * BAND_HEIGHT;
+      let y = PADDING_TOP;
+      for (let i = 0; i < invertedIndex; i++) {
+        const t = (TIER_COUNT - 1) - i;
+        y += bandHeight(t);
+      }
+      return y;
     };
 
     // ── 1. Collect unique spine nodes, sorted by number ──
@@ -214,9 +262,7 @@ export default function SpineMap() {
     };
     const posNodes: PosNode[] = [];
     const spineX = contentWidth / 2;
-    const spineCount = spineNodesList.length;
 
-    // Group spine nodes by tier, then position within each tier's band
     const spineByTier = new globalThis.Map<number, typeof spineNodesList>();
     spineNodesList.forEach((node) => {
       const tier = node.tier ?? 0;
@@ -225,8 +271,10 @@ export default function SpineMap() {
     });
 
     spineByTier.forEach((tierNodes, tier) => {
+      if (collapsedTiers.has(tier)) return; // skip collapsed tiers
+      const bh = bandHeight(tier);
       const bandTop = tierBandY(tier) + 30;
-      const bandBottom = tierBandY(tier) + BAND_HEIGHT - 30;
+      const bandBottom = tierBandY(tier) + bh - 30;
       tierNodes.forEach((node, i) => {
         const y = tierNodes.length === 1
           ? (bandTop + bandBottom) / 2
@@ -240,28 +288,27 @@ export default function SpineMap() {
       });
     });
 
-    // Re-sort posNodes by spine number for chain lines
     const spinePositioned = [...posNodes].sort((a, b) => {
       const aNum = parseInt(a.id.match(/s-(\d+)/i)![1]);
       const bNum = parseInt(b.id.match(/s-(\d+)/i)![1]);
       return aNum - bNum;
     });
 
-    // ── 2b. Collect and position branch nodes (deduplicated) ──
+    // ── 2b. Collect and position branch nodes ──
     type BranchNode = PosNode & { parents: { x: number; y: number }[] };
     const branchNodes: BranchNode[] = [];
     const spineIdSet = new Set(spineNodesMap.keys());
 
-    // Index spine posNodes by id for lookup
     const spinePosById = new globalThis.Map<string, PosNode>();
     spinePositioned.forEach((p) => spinePosById.set(p.id.toLowerCase(), p));
 
-    // Iterate non-spine nodes once, collect all parent positions
     const branchCandidates = nodes.filter((n) => !spineIdSet.has(n.id.toLowerCase()));
-    // Group by first parent gate for positioning index
     const gateChildCount = new globalThis.Map<string, number>();
 
     branchCandidates.forEach((b) => {
+      const bTier = b.tier ?? 0;
+      if (collapsedTiers.has(bTier)) return; // skip collapsed tiers
+
       const gates = Array.isArray(b.spine_gates) ? b.spine_gates : [];
       const parents: { x: number; y: number }[] = [];
       gates.forEach((g: string) => {
@@ -270,29 +317,22 @@ export default function SpineMap() {
       });
       if (parents.length === 0) return;
 
-      // Position relative to first parent
       const firstGateKey = gates[0].toLowerCase();
       const idx = gateChildCount.get(firstGateKey) ?? 0;
       gateChildCount.set(firstGateKey, idx + 1);
 
-      const firstParent = parents[0];
+      const parentPos = spinePosById.get(firstGateKey)!;
       const side = idx % 2 === 0 ? -1 : 1;
       const col = Math.floor(idx / 2);
       const xOffset = (col + 1) * 110 * side;
       const yJitter = (idx % 3 - 1) * 18;
 
-      const parentPos = spinePosById.get(firstGateKey)!;
       branchNodes.push({
-        id: b.id,
-        label: b.title,
-        x: parentPos.x + xOffset,
-        y: parentPos.y + yJitter,
-        tier: b.tier ?? parentPos.tier,
-        isSpine: false,
-        radius: 13,
-        color: TIER_COLORS[b.tier ?? parentPos.tier] ?? "hsl(0, 0%, 50%)",
-        navigateId: b.id,
-        parents,
+        id: b.id, label: b.title,
+        x: parentPos.x + xOffset, y: parentPos.y + yJitter,
+        tier: bTier, isSpine: false, radius: 13,
+        color: TIER_COLORS[bTier] ?? "hsl(0, 0%, 50%)",
+        navigateId: b.id, parents,
       });
     });
 
@@ -311,68 +351,103 @@ export default function SpineMap() {
       });
     svg.call(zoom);
 
-    // Tier bands
+    // Helper: is node matched by search?
+    const isMatch = (id: string) => matchingIds === null || matchingIds.has(id.toLowerCase());
+    const dimOpacity = 0.12;
+
+    // Tier bands (clickable labels for collapse/expand)
     for (let tier = 0; tier < TIER_COUNT; tier++) {
       const bandY = tierBandY(tier);
+      const bh = bandHeight(tier);
+      const collapsed = collapsedTiers.has(tier);
+
       g.append("rect")
         .attr("x", 0).attr("y", bandY)
-        .attr("width", contentWidth).attr("height", BAND_HEIGHT)
+        .attr("width", contentWidth).attr("height", bh)
         .attr("fill", TIER_BG_COLORS[tier] ?? "transparent")
         .attr("stroke", TIER_COLORS[tier] ?? "transparent")
         .attr("stroke-opacity", 0.2).attr("stroke-width", 1);
-      g.append("text")
-        .attr("x", 16).attr("y", bandY + BAND_HEIGHT / 2)
+
+      // Clickable tier label area
+      const labelGroup = g.append("g")
+        .attr("cursor", "pointer")
+        .on("click", () => toggleTier(tier));
+
+      // Chevron icon (▶ collapsed, ▼ expanded)
+      labelGroup.append("text")
+        .attr("x", 8).attr("y", bandY + (collapsed ? bh / 2 : bh / 2))
+        .attr("dy", "0.35em").attr("font-size", 12)
+        .attr("fill", TIER_COLORS[tier] ?? "currentColor").attr("opacity", 0.7)
+        .text(collapsed ? "▶" : "▼");
+
+      labelGroup.append("text")
+        .attr("x", 24).attr("y", bandY + (collapsed ? bh / 2 : bh / 2))
         .attr("dy", "0.35em").attr("font-size", 18).attr("font-weight", 800)
         .attr("fill", TIER_COLORS[tier] ?? "currentColor").attr("opacity", 0.85)
         .text(`T${tier}: ${TIER_LABELS[tier] ?? ""}`);
+
+      // Invisible hit area for easier clicking
+      labelGroup.append("rect")
+        .attr("x", 0).attr("y", bandY)
+        .attr("width", 340).attr("height", bh)
+        .attr("fill", "transparent");
     }
 
     // ── Spine chain lines ──
     for (let i = 0; i < spinePositioned.length - 1; i++) {
       const a = spinePositioned[i];
       const b = spinePositioned[i + 1];
+      const bothMatch = isMatch(a.id) && isMatch(b.id);
       g.append("line")
         .attr("x1", a.x).attr("y1", a.y)
         .attr("x2", b.x).attr("y2", b.y)
         .attr("stroke", "hsl(var(--foreground))")
         .attr("stroke-width", 2)
-        .attr("stroke-opacity", 0.25);
+        .attr("stroke-opacity", bothMatch ? 0.25 : dimOpacity);
     }
 
-    // ── Branch connection lines (one per parent) ──
+    // ── Branch connection lines ──
     branchNodes.forEach((bn) => {
+      const bnMatch = isMatch(bn.id);
       bn.parents.forEach((parent) => {
         g.append("line")
           .attr("x1", parent.x).attr("y1", parent.y)
           .attr("x2", bn.x).attr("y2", bn.y)
           .attr("stroke", bn.color)
           .attr("stroke-width", 1.2)
-          .attr("stroke-opacity", 0.35)
+          .attr("stroke-opacity", bnMatch ? 0.35 : dimOpacity)
           .attr("stroke-dasharray", "4 3");
       });
     });
 
-    // ── Branch node circles ──
-    g.append("g")
+    // ── Branch node circles (with animation) ──
+    const branchCircles = g.append("g")
       .selectAll<SVGCircleElement, BranchNode>("circle")
       .data(branchNodes).join("circle")
-      .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", (d) => d.radius)
+      .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", 0) // start at 0 for animation
       .attr("fill", (d) => d.color)
-      .attr("fill-opacity", 0.85)
-      .attr("stroke", "hsl(var(--foreground))")
-      .attr("stroke-width", 1.2)
+      .attr("fill-opacity", (d) => isMatch(d.id) ? 0.85 : dimOpacity)
+      .attr("stroke", (d) => {
+        if (matchingIds && matchingIds.has(d.id.toLowerCase())) return "hsl(var(--foreground))";
+        return "hsl(var(--foreground))";
+      })
+      .attr("stroke-width", (d) => matchingIds && matchingIds.has(d.id.toLowerCase()) ? 2.5 : 1.2)
       .attr("cursor", "pointer")
       .on("mouseover", function (event, d) {
-        d3.select(this).attr("r", d.radius * 1.4);
+        d3.select(this).transition().duration(150).attr("r", d.radius * 1.4);
         setTooltip({ x: event.offsetX, y: event.offsetY, text: d.label });
       })
       .on("mouseout", function (_event, d) {
-        d3.select(this).attr("r", d.radius);
+        d3.select(this).transition().duration(150).attr("r", d.radius);
         setTooltip(null);
       })
-      .on("click", (_event, d) => {
-        navigate(`/node/${d.navigateId}`);
-      });
+      .on("click", (_event, d) => navigate(`/node/${d.navigateId}`));
+
+    // Animate branch circles in
+    branchCircles.transition()
+      .duration(400)
+      .delay((_d, i) => 300 + i * 8)
+      .attr("r", (d) => d.radius);
 
     // ── Branch node labels ──
     g.append("g")
@@ -381,70 +456,128 @@ export default function SpineMap() {
       .text((d) => d.label.length > 18 ? d.label.slice(0, 16) + "…" : d.label)
       .attr("x", (d) => d.x).attr("y", (d) => d.y - 18)
       .attr("font-size", 9).attr("font-weight", 500)
-      .attr("fill", "hsl(var(--foreground))").attr("fill-opacity", 0.7)
+      .attr("fill", "hsl(var(--foreground))")
+      .attr("fill-opacity", (d) => isMatch(d.id) ? 0.7 : dimOpacity)
       .attr("text-anchor", "middle")
-      .attr("pointer-events", "none");
+      .attr("pointer-events", "none")
+      .attr("opacity", 0)
+      .transition().duration(400).delay((_d, i) => 300 + i * 8)
+      .attr("opacity", 1);
 
-    // ── Spine node circles ──
-    g.append("g")
+    // ── Spine node circles (with staggered animation) ──
+    const spineCircles = g.append("g")
       .selectAll<SVGCircleElement, PosNode>("circle")
       .data(spinePositioned).join("circle")
-      .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", (d) => d.radius)
+      .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", 0) // start at 0
       .attr("fill", (d) => d.color)
-      .attr("stroke", "hsl(var(--foreground))")
-      .attr("stroke-width", 2)
+      .attr("fill-opacity", (d) => isMatch(d.id) ? 1 : dimOpacity)
+      .attr("stroke", (d) => {
+        if (matchingIds && matchingIds.has(d.id.toLowerCase())) return "hsl(45, 100%, 60%)";
+        return "hsl(var(--foreground))";
+      })
+      .attr("stroke-width", (d) => matchingIds && matchingIds.has(d.id.toLowerCase()) ? 3 : 2)
       .attr("cursor", "pointer")
       .on("mouseover", function (event, d) {
-        d3.select(this).attr("r", d.radius * 1.3);
+        d3.select(this).transition().duration(150).attr("r", d.radius * 1.3);
         setTooltip({ x: event.offsetX, y: event.offsetY, text: d.label });
       })
       .on("mouseout", function (_event, d) {
-        d3.select(this).attr("r", d.radius);
+        d3.select(this).transition().duration(150).attr("r", d.radius);
         setTooltip(null);
       })
-      .on("click", (_event, d) => {
-        navigate(`/node/${d.navigateId}`);
-      });
+      .on("click", (_event, d) => navigate(`/node/${d.navigateId}`));
 
-    // ── Spine node labels ──
+    // Staggered fade-in from bottom to top
+    spineCircles.transition()
+      .duration(500)
+      .delay((_d, i) => i * 40)
+      .attr("r", (d) => d.radius);
+
+    // ── Spine node ID labels ──
     g.append("g")
       .selectAll("text")
       .data(spinePositioned).join("text")
       .text((d) => d.id.toUpperCase())
       .attr("x", (d) => d.x).attr("y", (d) => d.y - 34)
       .attr("font-size", 11).attr("font-weight", 700)
-      .attr("fill", "hsl(var(--foreground))").attr("text-anchor", "middle")
-      .attr("pointer-events", "none");
+      .attr("fill", "hsl(var(--foreground))")
+      .attr("fill-opacity", (d) => isMatch(d.id) ? 1 : dimOpacity)
+      .attr("text-anchor", "middle")
+      .attr("pointer-events", "none")
+      .attr("opacity", 0)
+      .transition().duration(500).delay((_d, i) => i * 40)
+      .attr("opacity", 1);
 
-  }, [nodes, navigate, showPrintView]);
+    // ── Node count badges ──
+    const badgeData = spinePositioned
+      .map((sp) => {
+        const count = branchCountBySpine.get(sp.id.toLowerCase()) ?? 0;
+        return { ...sp, count };
+      })
+      .filter((d) => d.count > 0);
+
+    const badgeG = g.append("g")
+      .selectAll<SVGGElement, typeof badgeData[0]>("g")
+      .data(badgeData).join("g")
+      .attr("transform", (d) => `translate(${d.x + d.radius * 0.7}, ${d.y - d.radius * 0.7})`)
+      .attr("pointer-events", "none")
+      .attr("opacity", 0);
+
+    badgeG.append("circle")
+      .attr("r", 10)
+      .attr("fill", (d) => d.color)
+      .attr("stroke", "hsl(var(--background))")
+      .attr("stroke-width", 2);
+
+    badgeG.append("text")
+      .text((d) => d.count.toString())
+      .attr("text-anchor", "middle")
+      .attr("dy", "0.35em")
+      .attr("font-size", 9)
+      .attr("font-weight", 700)
+      .attr("fill", "white");
+
+    badgeG.transition().duration(400).delay((_d, i) => 600 + i * 40).attr("opacity", 1);
+
+  }, [nodes, navigate, showPrintView, collapsedTiers, matchingIds, toggleTier, branchCountBySpine]);
 
   return (
     <AppLayout>
       <div className="px-4 py-6 max-w-[1600px] mx-auto print:px-2 print:py-2">
-        <div className="flex items-center justify-between mb-2 print:hidden">
-          <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground">
+        <div className="flex items-center justify-between mb-2 print:hidden gap-3">
+          <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground shrink-0">
             Vertebrae of Truth
           </h1>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (showPrintView) {
-                setShowPrintView(false);
-              } else {
-                setShowPrintView(true);
-              }
-            }}
-          >
-            {showPrintView ? <><Map className="w-4 h-4 mr-1.5" /> Map View</> : <><Printer className="w-4 h-4 mr-1.5" /> Print View</>}
-          </Button>
+          <div className="flex items-center gap-2">
+            {!showPrintView && (
+              <div className="relative w-48">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search nodes…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-8 pl-8 text-sm"
+                />
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (showPrintView) setShowPrintView(false);
+                else setShowPrintView(true);
+              }}
+            >
+              {showPrintView ? <><Map className="w-4 h-4 mr-1.5" /> Map View</> : <><Printer className="w-4 h-4 mr-1.5" /> Print View</>}
+            </Button>
+          </div>
         </div>
         <h1 className="hidden print:block text-xl font-bold mb-4">Spine Map — Node Listing</h1>
 
         <p className="text-muted-foreground text-sm mb-4 print:hidden">
           {showPrintView
             ? "Printable listing of all nodes grouped by tier and spine gate."
-            : "Vertical tier layout — lower tiers at the bottom, higher at the top. Click a branch to view it."}
+            : "Vertical tier layout — click a tier label to collapse/expand. Click a node to view it."}
         </p>
 
         {/* Legend — hide in print */}
