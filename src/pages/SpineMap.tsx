@@ -119,7 +119,7 @@ export default function SpineMap() {
   });
 
   // Precompute gate groupings for both views
-  const { gatesByTier, branchesByGate } = useMemo(() => {
+  const { gatesByTier, branchesByGate, gateToTitle } = useMemo(() => {
     if (!nodes) {
       return { gatesByTier: new globalThis.Map(), branchesByGate: new globalThis.Map() };
     }
@@ -167,7 +167,14 @@ export default function SpineMap() {
       });
     });
 
-    return { gatesByTier: byTier, branchesByGate: byGate };
+    // Build gate-to-title lookup: match gate name (e.g. "S-01") to node title
+    const gateToTitle = new globalThis.Map<string, string>();
+    gateSet.forEach((gate) => {
+      const match = nodes.find((n) => n.id.toLowerCase() === gate.toLowerCase());
+      if (match) gateToTitle.set(gate, match.title);
+    });
+
+    return { gatesByTier: byTier, branchesByGate: byGate, gateToTitle };
   }, [nodes]);
 
   useEffect(() => {
@@ -189,7 +196,7 @@ export default function SpineMap() {
 
     type PosNode = {
       id: string; label: string; x: number; y: number;
-      tier: number; isGate: boolean; radius: number; color: string; navigateId?: string;
+      tier: number; isGate: boolean; isSpine: boolean; radius: number; color: string; navigateId?: string;
     };
     const posNodes: PosNode[] = [];
 
@@ -203,7 +210,7 @@ export default function SpineMap() {
         const gateX = startX + (availableWidth / (gates.length + 1)) * (gi + 1);
         posNodes.push({
           id: `gate-${gate}`, label: gate, x: gateX, y: bandCenterY,
-          tier, isGate: true, radius: 24, color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)",
+          tier, isGate: true, isSpine: true, radius: 28, color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)",
         });
 
         const branches = branchesByGate.get(gate) ?? [];
@@ -214,10 +221,11 @@ export default function SpineMap() {
           const angle = branches.length === 1
             ? -Math.PI / 2
             : startAngle + (angleSpread / (branches.length - 1)) * bi;
+          const isSpineBranch = /^s-\d+$/i.test(branch.id);
           posNodes.push({
             id: branch.id, label: branch.title,
             x: gateX + Math.cos(angle) * arcRadius, y: bandCenterY + Math.sin(angle) * arcRadius,
-            tier, isGate: false, radius: 8,
+            tier, isGate: false, isSpine: isSpineBranch, radius: isSpineBranch ? 28 : 8,
             color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)", navigateId: branch.id,
           });
         });
@@ -290,16 +298,16 @@ export default function SpineMap() {
       .data(posNodes).join("circle")
       .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", (d) => d.radius)
       .attr("fill", (d) => d.color)
-      .attr("stroke", (d) => d.isGate ? "hsl(var(--foreground))" : "none")
-      .attr("stroke-width", (d) => d.isGate ? 2 : 0)
-      .attr("opacity", (d) => d.isGate ? 1 : 0.8)
+      .attr("stroke", (d) => d.isSpine ? "hsl(var(--foreground))" : "none")
+      .attr("stroke-width", (d) => d.isSpine ? 2 : 0)
+      .attr("opacity", (d) => d.isSpine ? 1 : 0.8)
       .attr("cursor", (d) => d.isGate ? "default" : "pointer")
       .on("mouseover", function (event, d) {
         d3.select(this).attr("r", d.radius * 1.4);
         setTooltip({
           x: event.offsetX,
           y: event.offsetY,
-          text: d.isGate ? `${d.label} — ${TIER_LABELS[d.tier] ?? ""}` : d.label,
+          text: d.isGate ? (gateToTitle.get(d.label) ?? `${d.label} — ${TIER_LABELS[d.tier] ?? ""}`) : d.label,
         });
       })
       .on("mouseout", function (_event, d) {
@@ -313,14 +321,14 @@ export default function SpineMap() {
     // Gate labels
     g.append("g")
       .selectAll("text")
-      .data(posNodes.filter((n) => n.isGate)).join("text")
-      .text((d) => d.label)
+      .data(posNodes.filter((n) => n.isSpine)).join("text")
+      .text((d) => d.isGate ? d.label : d.id.toUpperCase())
       .attr("x", (d) => d.x).attr("y", (d) => d.y - 32)
       .attr("font-size", 10).attr("font-weight", 600)
       .attr("fill", "hsl(var(--foreground))").attr("text-anchor", "middle")
       .attr("pointer-events", "none");
 
-  }, [nodes, navigate, showPrintView, gatesByTier, branchesByGate]);
+  }, [nodes, navigate, showPrintView, gatesByTier, branchesByGate, gateToTitle]);
 
   return (
     <AppLayout>
