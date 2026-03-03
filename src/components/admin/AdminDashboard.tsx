@@ -231,7 +231,7 @@ const AdminDashboard = ({ session, isEditor = false }: AdminDashboardProps) => {
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
-                          {(isEditor || (node as any).created_by === session.user.id) && (
+                          {(isEditor || (node as any).created_by === session.user.id || (node as any).created_by === null) && (
                             <Button
                               variant="ghost"
                               size="icon"
