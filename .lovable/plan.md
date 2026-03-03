@@ -1,22 +1,24 @@
 
 
-## Spine Map: Larger Tier Labels + Published-Only Filtering
+## Spine Map: Larger Spine Nodes + Fix Tooltip Display
+
+### Problem
+1. Spine gate nodes (S-01, S-02, etc.) are currently radius `18` — user wants them slightly larger and prominently sized
+2. Branch nodes at radius `7` are fine but could be slightly more visible
+3. Tooltips are not displaying on hover — the tooltip div is positioned relative to the container but the coordinates come from the SVG's zoom transform, which doesn't account for the container's offset in the page
 
 ### Changes (single file: `src/pages/SpineMap.tsx`)
 
-**1. Larger tier labels**
-- Line 263: Increase `font-size` from `12` to `18` and bump `font-weight` to `800`
-- This makes the "T0: Epistemological Bedrock" etc. labels more prominent and readable
+**1. Increase spine gate node size**
+- Line 206: Change gate `radius` from `18` to `24`
+- Line 298: The hover scale (`radius * 1.4`) will automatically scale with the larger size
+- Line 322: Adjust gate label y-offset from `-24` to `-32` so text doesn't overlap the bigger circle
 
-**2. Filter to published nodes only**
-- Line 113: Add `.eq("published", true)` to the query so only published nodes are fetched
-- This means the graph automatically updates as more nodes get published — unpublished nodes simply won't appear
-- Remove the conditional radius logic (line 219: `branch.published ? 7 : 4`) since all nodes will be published; use a fixed radius of `7`
+**2. Adjust branch node size**
+- Line 220: Keep branch radius at `7` (or bump to `8`) — already visible relative to the larger gates
 
-**3. Print view also reflects published-only**
-- No extra changes needed — the print view already renders from the same `nodes` data, so filtering at the query level covers both views
-
-### Technical Details
-- The query filter `.eq("published", true)` runs server-side, so the graph is always current with the latest published state
-- React Query's cache will refresh on remount, so publishing a node in admin and navigating to `/graph` will show the update
+**3. Fix tooltip positioning**
+- The tooltip div is `position: absolute` inside the container div, but `t.applyX(d.x)` gives coordinates in the full SVG viewBox space, not relative to the container
+- Lines 297-306: In the `mouseover` handler, use the mouse event's `offsetX`/`offsetY` (relative to the SVG element) instead of computing from node coordinates. Change `_event` to `event` and use `event.offsetX` / `event.offsetY` for tooltip position
+- This reliably positions the tooltip near the cursor regardless of zoom/pan state
 
