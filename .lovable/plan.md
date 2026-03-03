@@ -1,29 +1,47 @@
 
 
-## Fix Spine Node Sizing & Tooltip Titles
+## Understanding
 
-### Problem
-1. **S-02 appears as a small branch node** — it's in S-01's `spine_gates`, so the code treats it as a branch of S-01. But S-02 is itself a spine node (ID pattern `s-XX`) and should render at the same large size as S-01.
-2. **Gate tooltip shows ID + tier label, not the node's actual title** — e.g., hovering S-01 shows "S-01 — Epistemological Bedrock" instead of "Does truth exist, or is everything just perspective?"
+Yes — I understand exactly what you're describing. Right now, the code treats each gate (S-01, S-02, S-03) as an independent hub within its tier band, and when S-02 appears in S-01's `spine_gates`, it gets drawn *again* as a branch satellite. This creates duplicates and loses the sequential chain structure.
 
-### Root Cause
-- Gates are synthetic hubs created from `spine_gates` string values. They have no link back to the actual node record, so there's no title to display.
-- Branch nodes that happen to be spine nodes (like S-02) get the small branch radius because the code doesn't distinguish them.
+What you want is a **vertical spine column** — like vertebrae stacked bottom-to-top:
 
-### Changes (`src/pages/SpineMap.tsx`)
+```text
+        S-03    ← top
+          |
+        S-02    ← middle  
+          |
+        S-01    ← bottom (foundational)
+```
 
-**1. Build a gate-to-title lookup** (in the `useMemo` or early in the `useEffect`):
-- Create a map from gate name (e.g., `"S-01"`) to the matching node's title by checking if any node's `id` matches (case-insensitive, e.g., `s-01` → `S-01`)
-- This lets the tooltip display the real title
+Each spine node (S-01 through S-25) is a single disk positioned along a central vertical axis, ordered by its number. The tier bands still exist as colored background regions, but spine nodes are placed sequentially up the column regardless of how many fall in the same tier. Branch nodes will later radiate horizontally outward from their parent spine node.
 
-**2. Fix tooltip text for gates** (~line 300):
-- Change `d.isGate ? \`${d.label} — ${TIER_LABELS[d.tier]}\`` to use the looked-up title when available, falling back to the current format
+The key insight: the spine is **one continuous vertical chain**, not scattered hubs per tier. S-02 references S-01 not because it's a "branch" of S-01, but because S-01 is its prerequisite — so S-02 sits directly above S-01 on the spine.
 
-**3. Render spine-patterned branch nodes at gate size** (~line 220):
-- When creating branch `PosNode`, check if `branch.id` matches `/^s-\d+$/i`
-- If yes, set `radius: 24` (same as gates) instead of `8`
-- Also add the gate stroke styling for these nodes (handled in the rendering attributes by checking a new `isSpine` flag on PosNode, or simply checking the ID pattern)
+---
 
-**4. Add gate label text for spine-patterned branches** (~line 315):
-- Currently only `isGate` nodes get a text label above them; spine-patterned branches should also get their ID label (e.g., "S-02") rendered above
+## Plan (`src/pages/SpineMap.tsx`)
+
+### 1. Deduplicate spine nodes
+- Currently spine nodes can appear both as a gate hub AND as a branch of another gate. Instead, collect all unique spine nodes (matching `s-\d+`) into a single ordered list sorted by their numeric suffix.
+- Each spine node gets **one** position on the vertical axis — no duplicates.
+
+### 2. Layout spine as a vertical column
+- Position all spine nodes along a single X coordinate (center of the content area).
+- Stack them vertically bottom-to-top by spine number: S-01 at the bottom, S-25 at the top.
+- Space them evenly within the total chart height so they span across the tier bands naturally.
+- Draw connecting lines between consecutive spine nodes (S-01→S-02→S-03…) to form the vertebral chain.
+
+### 3. Keep tier bands as background context
+- The colored horizontal tier bands remain, providing visual context for which tier each spine node falls in.
+- Spine nodes are colored by their tier as before, so you can see which tier region they belong to.
+
+### 4. Exclude spine nodes from branch rendering
+- When rendering branches around a gate, skip any branch whose ID matches the spine pattern (`s-\d+`) — those are already on the spine column.
+- Non-spine branches will later radiate outward from their parent spine node (not implemented yet, but the structure supports it).
+
+### 5. Labels and tooltips unchanged
+- Spine node labels (S-01, S-02…) render above each disk.
+- Tooltips still show the node's actual title on hover.
+- Click-to-navigate still works for all nodes.
 
