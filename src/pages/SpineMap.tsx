@@ -47,8 +47,10 @@ const TIER_LABELS: Record<number, string> = {
   6: "Testing the Bible",
 };
 
-const BAND_HEIGHT_EXPANDED = 180;
+const BAND_HEIGHT_MIN = 180;
 const BAND_HEIGHT_COLLAPSED = 44;
+const NODE_VERTICAL_SPACING = 70;
+const ZIGZAG_OFFSET = 30;
 const PADDING_TOP = 40;
 const PADDING_BOTTOM = 40;
 const TIER_COUNT = 7;
@@ -225,9 +227,27 @@ export default function SpineMap() {
     const containerWidth = containerRef.current.clientWidth;
     const contentWidth = Math.max(containerWidth, 900);
 
-    // Dynamic band height based on collapsed state
-    const bandHeight = (tier: number) =>
-      collapsedTiers.has(tier) ? BAND_HEIGHT_COLLAPSED : BAND_HEIGHT_EXPANDED;
+    // ── Pre-pass: count spine nodes per tier for dynamic band heights ──
+    const spinePattern = /^s-(\d+)$/i;
+    const spineNodesMap = new globalThis.Map<string, NodeRecord>();
+    nodes.forEach((n) => {
+      if (spinePattern.test(n.id)) {
+        spineNodesMap.set(n.id.toLowerCase(), n);
+      }
+    });
+
+    const spineCountByTier = new globalThis.Map<number, number>();
+    spineNodesMap.forEach((n) => {
+      const t = n.tier ?? 0;
+      spineCountByTier.set(t, (spineCountByTier.get(t) ?? 0) + 1);
+    });
+
+    // Dynamic band height: max(BAND_HEIGHT_MIN, count * NODE_VERTICAL_SPACING + padding)
+    const bandHeight = (tier: number) => {
+      if (collapsedTiers.has(tier)) return BAND_HEIGHT_COLLAPSED;
+      const count = spineCountByTier.get(tier) ?? 0;
+      return Math.max(BAND_HEIGHT_MIN, count * NODE_VERTICAL_SPACING + 60);
+    };
 
     const totalHeight = PADDING_TOP + Array.from({ length: TIER_COUNT }, (_, i) => bandHeight(i)).reduce((a, b) => a + b, 0) + PADDING_BOTTOM;
 
@@ -242,20 +262,13 @@ export default function SpineMap() {
     };
 
     // ── 1. Collect unique spine nodes, sorted by number ──
-    const spinePattern = /^s-(\d+)$/i;
-    const spineNodesMap = new globalThis.Map<string, NodeRecord>();
-    nodes.forEach((n) => {
-      if (spinePattern.test(n.id)) {
-        spineNodesMap.set(n.id.toLowerCase(), n);
-      }
-    });
     const spineNodesList = Array.from(spineNodesMap.values()).sort((a, b) => {
       const aNum = parseInt(a.id.match(spinePattern)![1]);
       const bNum = parseInt(b.id.match(spinePattern)![1]);
       return aNum - bNum;
     });
 
-    // ── 2. Position spine nodes as vertical column ──
+    // ── 2. Position spine nodes with zigzag offset ──
     type PosNode = {
       id: string; label: string; x: number; y: number;
       tier: number; isSpine: boolean; radius: number; color: string; navigateId: string;
@@ -270,8 +283,12 @@ export default function SpineMap() {
       spineByTier.get(tier)!.push(node);
     });
 
-    spineByTier.forEach((tierNodes, tier) => {
-      if (collapsedTiers.has(tier)) return; // skip collapsed tiers
+    // Track global spine index for consistent zigzag across tiers
+    let globalSpineIdx = 0;
+    // Process tiers bottom-to-top so globalSpineIdx increments naturally
+    for (let tier = 0; tier < TIER_COUNT; tier++) {
+      const tierNodes = spineByTier.get(tier);
+      if (!tierNodes || collapsedTiers.has(tier)) continue;
       const bh = bandHeight(tier);
       const bandTop = tierBandY(tier) + 30;
       const bandBottom = tierBandY(tier) + bh - 30;
@@ -279,14 +296,16 @@ export default function SpineMap() {
         const y = tierNodes.length === 1
           ? (bandTop + bandBottom) / 2
           : bandBottom - (bandBottom - bandTop) * (i / (tierNodes.length - 1));
+        const xOffset = (globalSpineIdx % 2 === 0 ? -1 : 1) * ZIGZAG_OFFSET;
         posNodes.push({
-          id: node.id, label: node.title, x: spineX, y,
+          id: node.id, label: node.title, x: spineX + xOffset, y,
           tier, isSpine: true, radius: 28,
           color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)",
           navigateId: node.id,
         });
+        globalSpineIdx++;
       });
-    });
+    }
 
     const spinePositioned = [...posNodes].sort((a, b) => {
       const aNum = parseInt(a.id.match(/s-(\d+)/i)![1]);
