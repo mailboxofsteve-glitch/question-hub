@@ -1,24 +1,29 @@
 
 
-## Spine Map: Larger Spine Nodes + Fix Tooltip Display
+## Fix Spine Node Sizing & Tooltip Titles
 
 ### Problem
-1. Spine gate nodes (S-01, S-02, etc.) are currently radius `18` — user wants them slightly larger and prominently sized
-2. Branch nodes at radius `7` are fine but could be slightly more visible
-3. Tooltips are not displaying on hover — the tooltip div is positioned relative to the container but the coordinates come from the SVG's zoom transform, which doesn't account for the container's offset in the page
+1. **S-02 appears as a small branch node** — it's in S-01's `spine_gates`, so the code treats it as a branch of S-01. But S-02 is itself a spine node (ID pattern `s-XX`) and should render at the same large size as S-01.
+2. **Gate tooltip shows ID + tier label, not the node's actual title** — e.g., hovering S-01 shows "S-01 — Epistemological Bedrock" instead of "Does truth exist, or is everything just perspective?"
 
-### Changes (single file: `src/pages/SpineMap.tsx`)
+### Root Cause
+- Gates are synthetic hubs created from `spine_gates` string values. They have no link back to the actual node record, so there's no title to display.
+- Branch nodes that happen to be spine nodes (like S-02) get the small branch radius because the code doesn't distinguish them.
 
-**1. Increase spine gate node size**
-- Line 206: Change gate `radius` from `18` to `24`
-- Line 298: The hover scale (`radius * 1.4`) will automatically scale with the larger size
-- Line 322: Adjust gate label y-offset from `-24` to `-32` so text doesn't overlap the bigger circle
+### Changes (`src/pages/SpineMap.tsx`)
 
-**2. Adjust branch node size**
-- Line 220: Keep branch radius at `7` (or bump to `8`) — already visible relative to the larger gates
+**1. Build a gate-to-title lookup** (in the `useMemo` or early in the `useEffect`):
+- Create a map from gate name (e.g., `"S-01"`) to the matching node's title by checking if any node's `id` matches (case-insensitive, e.g., `s-01` → `S-01`)
+- This lets the tooltip display the real title
 
-**3. Fix tooltip positioning**
-- The tooltip div is `position: absolute` inside the container div, but `t.applyX(d.x)` gives coordinates in the full SVG viewBox space, not relative to the container
-- Lines 297-306: In the `mouseover` handler, use the mouse event's `offsetX`/`offsetY` (relative to the SVG element) instead of computing from node coordinates. Change `_event` to `event` and use `event.offsetX` / `event.offsetY` for tooltip position
-- This reliably positions the tooltip near the cursor regardless of zoom/pan state
+**2. Fix tooltip text for gates** (~line 300):
+- Change `d.isGate ? \`${d.label} — ${TIER_LABELS[d.tier]}\`` to use the looked-up title when available, falling back to the current format
+
+**3. Render spine-patterned branch nodes at gate size** (~line 220):
+- When creating branch `PosNode`, check if `branch.id` matches `/^s-\d+$/i`
+- If yes, set `radius: 24` (same as gates) instead of `8`
+- Also add the gate stroke styling for these nodes (handled in the rendering attributes by checking a new `isSpine` flag on PosNode, or simply checking the ID pattern)
+
+**4. Add gate label text for spine-patterned branches** (~line 315):
+- Currently only `isGate` nodes get a text label above them; spine-patterned branches should also get their ID label (e.g., "S-02") rendered above
 
