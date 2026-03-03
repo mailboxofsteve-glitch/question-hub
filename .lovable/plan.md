@@ -1,19 +1,38 @@
 
 
-## Fix Duplicate Branch Nodes on Spine Map
+## Enhance the Vertebrae of Truth Graph
 
-### Problem
-The current code iterates over each spine gate reference and creates a separate branch node entry per gate. A node like `what-is-a-worldview` with `spine_gates: ["S-01", "S-02"]` appears twice — once under S-01 and once under S-02.
+Four improvements to the interactive graph, all within `src/pages/SpineMap.tsx`, preserving the existing tier/spine/branch structure.
 
-### Solution (single file: `src/pages/SpineMap.tsx`)
+---
 
-Change the branch collection logic so each branch node appears only once, but can have **multiple parent connections**.
+### 1. Animated Transitions
+- **On load**: Fade-in spine nodes sequentially (bottom to top) using D3 transitions with staggered delays, then fade in branch nodes.
+- **On hover**: Smooth radius scaling via D3 `.transition().duration(150)` instead of the current instant resize.
+- **Zoom/pan**: Already smooth via D3 zoom; no changes needed.
 
-1. **Deduplicate branch nodes**: Instead of grouping by gate and pushing duplicates, iterate over non-spine nodes once. For each node, collect all matching spine parent positions. Position the node relative to its **first** parent gate (or the midpoint of its parents). Track all parent coordinates.
+### 2. Tier Collapse/Expand
+- Add a `collapsedTiers` state (`Set<number>`).
+- Make each tier label clickable. Clicking toggles that tier in the set.
+- When a tier is collapsed, reduce its band height to ~40px (just showing the label + a chevron icon), hide all spine and branch nodes within that tier, and skip their connection lines.
+- Recalculate `tierBandY` dynamically based on which tiers are collapsed, so the layout compresses smoothly.
 
-2. **Update the BranchNode type**: Change `parentX`/`parentY` to an array of parent positions: `parents: { x: number; y: number }[]`.
+### 3. Search & Highlight
+- Add a small search input above the graph (next to the Print View button).
+- On typing, filter `nodes` by title match. Nodes that don't match get reduced opacity (0.15) on both circles and labels. Matching nodes get a bright stroke highlight ring.
+- Connection lines to non-matching nodes also dim. Clearing the input restores full opacity.
+- Uses local state only; no backend calls.
 
-3. **Draw multiple connection lines**: When rendering branch connection lines, iterate over `bn.parents` and draw a line from each parent to the branch node.
+### 4. Node Count Badges
+- For each spine node, count how many branch nodes reference it via `spine_gates`.
+- Render a small text element (or circle + text) offset to the upper-right of each spine circle showing the count (e.g., "3").
+- Only show the badge when count > 0. Style with a small filled circle background matching the tier color.
 
-4. **Result**: One circle per branch node, with dashed lines fanning out to each referenced spine gate.
+---
+
+### Technical notes
+- All changes are in `src/pages/SpineMap.tsx` (the D3 `useEffect` and the JSX above/around the SVG).
+- New React state: `collapsedTiers: Set<number>`, `searchQuery: string`.
+- The `useEffect` dependency array will include `collapsedTiers` and `searchQuery` so the SVG re-renders when they change.
+- Badge counts are derived from `branchesByGate` (already computed in `useMemo`).
 
