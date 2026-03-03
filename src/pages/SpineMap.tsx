@@ -111,6 +111,7 @@ export default function SpineMap() {
         .from("nodes")
         .select("id, title, tier, spine_gates, published, category")
         .not("tier", "is", null)
+        .eq("published", true)
         .order("tier");
       if (error) throw error;
       return (data ?? []) as NodeRecord[];
@@ -216,7 +217,7 @@ export default function SpineMap() {
           posNodes.push({
             id: branch.id, label: branch.title,
             x: gateX + Math.cos(angle) * arcRadius, y: bandCenterY + Math.sin(angle) * arcRadius,
-            tier, isGate: false, radius: branch.published ? 7 : 4,
+            tier, isGate: false, radius: 7,
             color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)", navigateId: branch.id,
           });
         });
@@ -260,7 +261,7 @@ export default function SpineMap() {
         .attr("stroke-opacity", 0.2).attr("stroke-width", 1);
       g.append("text")
         .attr("x", 16).attr("y", bandY + BAND_HEIGHT / 2)
-        .attr("dy", "0.35em").attr("font-size", 12).attr("font-weight", 700)
+        .attr("dy", "0.35em").attr("font-size", 18).attr("font-weight", 800)
         .attr("fill", TIER_COLORS[tier] ?? "currentColor").attr("opacity", 0.85)
         .text(`T${tier}: ${TIER_LABELS[tier] ?? ""}`);
     }
