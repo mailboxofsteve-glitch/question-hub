@@ -1,38 +1,20 @@
 
 
-## Enhance the Vertebrae of Truth Graph
+## Space Out Spine Nodes with Staggered Offset
 
-Four improvements to the interactive graph, all within `src/pages/SpineMap.tsx`, preserving the existing tier/spine/branch structure.
+### Problem
+Spine nodes (radius 28) within the same tier band overlap because the 180px band height isn't enough when multiple nodes share a tier. They're also all on the same X coordinate, creating a crowded column.
 
----
+### Solution (single file: `src/pages/SpineMap.tsx`)
 
-### 1. Animated Transitions
-- **On load**: Fade-in spine nodes sequentially (bottom to top) using D3 transitions with staggered delays, then fade in branch nodes.
-- **On hover**: Smooth radius scaling via D3 `.transition().duration(150)` instead of the current instant resize.
-- **Zoom/pan**: Already smooth via D3 zoom; no changes needed.
+1. **Dynamic band height**: Instead of a fixed 180px, calculate each tier's expanded height based on how many spine nodes it contains. Use a minimum vertical spacing of ~70px per node (diameter + gap), with a floor of 180px for tiers with 0-2 nodes.
 
-### 2. Tier Collapse/Expand
-- Add a `collapsedTiers` state (`Set<number>`).
-- Make each tier label clickable. Clicking toggles that tier in the set.
-- When a tier is collapsed, reduce its band height to ~40px (just showing the label + a chevron icon), hide all spine and branch nodes within that tier, and skip their connection lines.
-- Recalculate `tierBandY` dynamically based on which tiers are collapsed, so the layout compresses smoothly.
+2. **Horizontal zigzag offset**: Alternate spine nodes left and right of center by ~30px, creating a subtle serpentine/DNA-helix effect along the vertebral column. Even-indexed nodes shift left, odd-indexed shift right (or vice versa). This visually separates overlapping nodes and adds visual interest.
 
-### 3. Search & Highlight
-- Add a small search input above the graph (next to the Print View button).
-- On typing, filter `nodes` by title match. Nodes that don't match get reduced opacity (0.15) on both circles and labels. Matching nodes get a bright stroke highlight ring.
-- Connection lines to non-matching nodes also dim. Clearing the input restores full opacity.
-- Uses local state only; no backend calls.
+3. **Update spine chain lines**: The connecting lines between sequential spine nodes already use each node's `(x, y)`, so the zigzag will automatically produce angled chain segments, reinforcing the vertebral aesthetic.
 
-### 4. Node Count Badges
-- For each spine node, count how many branch nodes reference it via `spine_gates`.
-- Render a small text element (or circle + text) offset to the upper-right of each spine circle showing the count (e.g., "3").
-- Only show the badge when count > 0. Style with a small filled circle background matching the tier color.
-
----
-
-### Technical notes
-- All changes are in `src/pages/SpineMap.tsx` (the D3 `useEffect` and the JSX above/around the SVG).
-- New React state: `collapsedTiers: Set<number>`, `searchQuery: string`.
-- The `useEffect` dependency array will include `collapsedTiers` and `searchQuery` so the SVG re-renders when they change.
-- Badge counts are derived from `branchesByGate` (already computed in `useMemo`).
+### Changes
+- Add a pre-pass that counts spine nodes per tier and computes per-tier band heights before layout.
+- In the spine positioning loop, apply `x = spineX + (i % 2 === 0 ? -1 : 1) * 30` for the zigzag.
+- Increase minimum spacing so centers are at least 70px apart vertically.
 
