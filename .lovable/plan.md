@@ -1,29 +1,24 @@
 
 
-## Spine Map: Tooltip Fix + Printable Version
+## Allow admins to edit unowned nodes & claim ownership on edit
 
-### Issue 1: Tooltips not showing correctly
+### Problem
+Currently, the PUT handler at line 173-176 blocks admins from editing nodes they didn't create. Nodes inserted via bulk migration have `created_by = null`, so no admin can edit them. The user wants:
+1. If `created_by` is null, **any** admin (or editor) can edit the node
+2. Upon editing, the editor's `created_by` is set to the editing user, claiming ownership
+3. The "Submitted By" column in the dashboard updates accordingly
 
-The tooltip uses raw SVG coordinates (`d.x`, `d.y`) for positioning, but these don't account for the D3 zoom/pan transform applied to the `<g>` group. When the user zooms or pans, tooltips appear at incorrect positions (or off-screen), making them seem like they don't work for many nodes.
+### Changes
 
-**Fix**: Capture the current zoom transform and apply it to the tooltip coordinates. Use `d3.zoomTransform(svgRef.current)` to convert SVG-space coordinates to screen-space coordinates before positioning the tooltip div.
+**`supabase/functions/admin-nodes/index.ts`** — PUT handler (lines 172-178):
+- Change the admin ownership check: only block if `existing.created_by` is **not null** AND differs from `userId`
+- Always set `updateData.created_by = userId` when the node currently has no owner (`created_by` is null)
+- For editors, also set `created_by = userId` when the node is unowned
 
-### Issue 2: Printable Version
+**`src/components/admin/AdminDashboard.tsx`** — Edit button visibility (around line 175):
+- Currently the edit button only shows for editors or if `created_by === session.user.id`
+- Add a third condition: also show the edit button when `created_by` is null (unowned node), so any admin sees it
 
-Add a "Print View" button that toggles between the interactive SVG map and a clean, printer-friendly HTML listing of all nodes organized by tier.
-
-**Print view layout**:
-- Grouped by tier (T0–T6), each with its label and color accent
-- Under each tier, spine gates listed as subheadings
-- Branch nodes listed under their parent gate with titles
-- Uses `@media print` CSS to hide the interactive map, navigation, and legend
-- A "Print" button triggers `window.print()`
-
-### Changes (single file: `src/pages/SpineMap.tsx`)
-
-1. Store the current D3 zoom transform in a ref; update it in the zoom handler
-2. In `mouseover`, apply the transform to `d.x`/`d.y` before setting tooltip state
-3. Add a `showPrintView` state toggle
-4. When active, render an HTML list (tier → gates → branches) instead of the SVG, with a print button
-5. Add `print:` Tailwind variants to hide nav/legend in print mode
+### No database or schema changes needed
+The `created_by` column is already nullable UUID — this is purely edge function logic + frontend visibility.
 
