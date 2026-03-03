@@ -76,6 +76,8 @@ const WriterGuideDialog = () => (
               <li><code className="bg-muted px-1 rounded text-xs">*italic*</code> → <em>italic</em></li>
               <li><code className="bg-muted px-1 rounded text-xs">**bold**</code> → <strong>bold</strong></li>
               <li><code className="bg-muted px-1 rounded text-xs">***bold &amp; italic***</code> → <strong><em>bold &amp; italic</em></strong></li>
+              <li><code className="bg-muted px-1 rounded text-xs">- item</code> → bullet list</li>
+              <li><code className="bg-muted px-1 rounded text-xs">1. item</code> → numbered list</li>
             </ul>
             <div className="mt-3 p-3 rounded bg-muted/50 space-y-1">
               <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Supported fields</p>

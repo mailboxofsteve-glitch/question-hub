@@ -11,7 +11,7 @@ const MarkdownText = ({ content, className }: MarkdownTextProps) => {
   return (
     <span className={className}>
       <ReactMarkdown
-        allowedElements={['p', 'em', 'strong', 'a', 'br']}
+        allowedElements={['p', 'em', 'strong', 'a', 'br', 'ul', 'ol', 'li']}
         unwrapDisallowed
         components={{
           p: ({ children }) => <>{children}</>,
@@ -20,6 +20,9 @@ const MarkdownText = ({ content, className }: MarkdownTextProps) => {
               {children}
             </a>
           ),
+          ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>,
+          li: ({ children }) => <li>{children}</li>,
         }}
       >
         {content}
