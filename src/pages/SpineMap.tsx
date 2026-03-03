@@ -183,7 +183,6 @@ export default function SpineMap() {
     const containerWidth = containerRef.current.clientWidth;
     const TIER_COUNT = 7;
     const BAND_HEIGHT = 180;
-    const LABEL_WIDTH = 180;
     const PADDING_TOP = 40;
     const PADDING_BOTTOM = 40;
     const totalHeight = PADDING_TOP + TIER_COUNT * BAND_HEIGHT + PADDING_BOTTOM;
@@ -194,56 +193,47 @@ export default function SpineMap() {
       return PADDING_TOP + invertedIndex * BAND_HEIGHT;
     };
 
-    type PosNode = {
-      id: string; label: string; x: number; y: number;
-      tier: number; isGate: boolean; isSpine: boolean; radius: number; color: string; navigateId?: string;
-    };
-    const posNodes: PosNode[] = [];
-
-    for (let tier = 0; tier < TIER_COUNT; tier++) {
-      const gates = gatesByTier.get(tier) ?? [];
-      const bandCenterY = tierBandY(tier) + BAND_HEIGHT / 2;
-      const availableWidth = contentWidth - LABEL_WIDTH - 40;
-      const startX = LABEL_WIDTH + 40;
-
-      gates.forEach((gate, gi) => {
-        const gateX = startX + (availableWidth / (gates.length + 1)) * (gi + 1);
-        posNodes.push({
-          id: `gate-${gate}`, label: gate, x: gateX, y: bandCenterY,
-          tier, isGate: true, isSpine: true, radius: 28, color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)",
-        });
-
-        const branches = branchesByGate.get(gate) ?? [];
-        const arcRadius = 45;
-        branches.forEach((branch, bi) => {
-          const angleSpread = Math.min(Math.PI * 1.4, branches.length * 0.35);
-          const startAngle = -Math.PI / 2 - angleSpread / 2;
-          const angle = branches.length === 1
-            ? -Math.PI / 2
-            : startAngle + (angleSpread / (branches.length - 1)) * bi;
-          const isSpineBranch = /^s-\d+$/i.test(branch.id);
-          posNodes.push({
-            id: branch.id, label: branch.title,
-            x: gateX + Math.cos(angle) * arcRadius, y: bandCenterY + Math.sin(angle) * arcRadius,
-            tier, isGate: false, isSpine: isSpineBranch, radius: isSpineBranch ? 28 : 8,
-            color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)", navigateId: branch.id,
-          });
-        });
-      });
-    }
-
-    // Links
-    type PosLink = { sourceId: string; targetId: string };
-    const posLinks: PosLink[] = [];
+    // ── 1. Collect unique spine nodes, sorted by number ──
+    const spinePattern = /^s-(\d+)$/i;
+    const spineNodesMap = new globalThis.Map<string, NodeRecord>();
     nodes.forEach((n) => {
-      const gates = Array.isArray(n.spine_gates) ? n.spine_gates : [];
-      gates.forEach((g: string) => posLinks.push({ sourceId: `gate-${g}`, targetId: n.id }));
+      if (spinePattern.test(n.id)) {
+        spineNodesMap.set(n.id.toLowerCase(), n);
+      }
+    });
+    const spineNodesList = Array.from(spineNodesMap.values()).sort((a, b) => {
+      const aNum = parseInt(a.id.match(spinePattern)![1]);
+      const bNum = parseInt(b.id.match(spinePattern)![1]);
+      return aNum - bNum;
     });
 
-    const nodeById = new globalThis.Map<string, PosNode>();
-    posNodes.forEach((n) => nodeById.set(n.id, n));
+    // ── 2. Position spine nodes as vertical column ──
+    type PosNode = {
+      id: string; label: string; x: number; y: number;
+      tier: number; isSpine: boolean; radius: number; color: string; navigateId: string;
+    };
+    const posNodes: PosNode[] = [];
+    const spineX = contentWidth / 2;
+    const spineCount = spineNodesList.length;
 
-    // Render
+    // Bottom of T0 band to top of T6 band
+    const spineBottomY = tierBandY(0) + BAND_HEIGHT - 30;
+    const spineTopY = tierBandY(6) + 30;
+
+    spineNodesList.forEach((node, i) => {
+      const y = spineCount === 1
+        ? (spineBottomY + spineTopY) / 2
+        : spineBottomY - (spineBottomY - spineTopY) * (i / (spineCount - 1));
+      const tier = node.tier ?? 0;
+      posNodes.push({
+        id: node.id, label: node.title, x: spineX, y,
+        tier, isSpine: true, radius: 28,
+        color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)",
+        navigateId: node.id,
+      });
+    });
+
+    // ── 3. Render ──
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
     svg.attr("viewBox", `0 0 ${contentWidth} ${totalHeight}`);
@@ -274,61 +264,50 @@ export default function SpineMap() {
         .text(`T${tier}: ${TIER_LABELS[tier] ?? ""}`);
     }
 
-    // Spine line
-    const spineX = contentWidth / 2;
-    g.append("line")
-      .attr("x1", spineX).attr("y1", tierBandY(6) + BAND_HEIGHT / 2)
-      .attr("x2", spineX).attr("y2", tierBandY(0) + BAND_HEIGHT / 2)
-      .attr("stroke", "hsl(var(--border))").attr("stroke-width", 2)
-      .attr("stroke-dasharray", "6,4").attr("opacity", 0.3);
-
-    // Links
-    posLinks.forEach((link) => {
-      const s = nodeById.get(link.sourceId);
-      const t = nodeById.get(link.targetId);
-      if (!s || !t) return;
+    // ── Spine chain lines ──
+    for (let i = 0; i < posNodes.length - 1; i++) {
+      const a = posNodes[i];
+      const b = posNodes[i + 1];
       g.append("line")
-        .attr("x1", s.x).attr("y1", s.y).attr("x2", t.x).attr("y2", t.y)
-        .attr("stroke", s.color).attr("stroke-opacity", 0.15).attr("stroke-width", 1);
-    });
+        .attr("x1", a.x).attr("y1", a.y)
+        .attr("x2", b.x).attr("y2", b.y)
+        .attr("stroke", "hsl(var(--foreground))")
+        .attr("stroke-width", 2)
+        .attr("stroke-opacity", 0.25);
+    }
 
-    // Nodes
+    // ── Spine node circles ──
     g.append("g")
       .selectAll<SVGCircleElement, PosNode>("circle")
       .data(posNodes).join("circle")
       .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", (d) => d.radius)
       .attr("fill", (d) => d.color)
-      .attr("stroke", (d) => d.isSpine ? "hsl(var(--foreground))" : "none")
-      .attr("stroke-width", (d) => d.isSpine ? 2 : 0)
-      .attr("opacity", (d) => d.isSpine ? 1 : 0.8)
-      .attr("cursor", (d) => d.isGate ? "default" : "pointer")
+      .attr("stroke", "hsl(var(--foreground))")
+      .attr("stroke-width", 2)
+      .attr("cursor", "pointer")
       .on("mouseover", function (event, d) {
-        d3.select(this).attr("r", d.radius * 1.4);
-        setTooltip({
-          x: event.offsetX,
-          y: event.offsetY,
-          text: d.isGate ? (gateToTitle.get(d.label) ?? `${d.label} — ${TIER_LABELS[d.tier] ?? ""}`) : d.label,
-        });
+        d3.select(this).attr("r", d.radius * 1.3);
+        setTooltip({ x: event.offsetX, y: event.offsetY, text: d.label });
       })
       .on("mouseout", function (_event, d) {
         d3.select(this).attr("r", d.radius);
         setTooltip(null);
       })
       .on("click", (_event, d) => {
-        if (d.navigateId) navigate(`/node/${d.navigateId}`);
+        navigate(`/node/${d.navigateId}`);
       });
 
-    // Gate labels
+    // ── Spine node labels ──
     g.append("g")
       .selectAll("text")
-      .data(posNodes.filter((n) => n.isSpine)).join("text")
-      .text((d) => d.isGate ? d.label : d.id.toUpperCase())
-      .attr("x", (d) => d.x).attr("y", (d) => d.y - 32)
-      .attr("font-size", 10).attr("font-weight", 600)
+      .data(posNodes).join("text")
+      .text((d) => d.id.toUpperCase())
+      .attr("x", (d) => d.x).attr("y", (d) => d.y - 34)
+      .attr("font-size", 11).attr("font-weight", 700)
       .attr("fill", "hsl(var(--foreground))").attr("text-anchor", "middle")
       .attr("pointer-events", "none");
 
-  }, [nodes, navigate, showPrintView, gatesByTier, branchesByGate, gateToTitle]);
+  }, [nodes, navigate, showPrintView]);
 
   return (
     <AppLayout>
