@@ -1,44 +1,19 @@
 
 
-## Show Branch Nodes on the Spine Map
+## Fix Duplicate Branch Nodes on Spine Map
 
 ### Problem
-The Spine Map only renders spine nodes (IDs matching `S-01`, `S-02`, etc.). Branch nodes like `what-is-a-worldview` that reference a spine gate via `spine_gates: ["S-02"]` are never placed on the SVG. The data is fetched (it's in the query results), but no code positions or draws them.
+The current code iterates over each spine gate reference and creates a separate branch node entry per gate. A node like `what-is-a-worldview` with `spine_gates: ["S-01", "S-02"]` appears twice — once under S-01 and once under S-02.
 
-### Solution
-After positioning spine nodes, iterate over all non-spine published nodes that have `spine_gates`, and render them as smaller satellite circles radiating horizontally from their parent spine node.
+### Solution (single file: `src/pages/SpineMap.tsx`)
 
-### Changes (single file: `src/pages/SpineMap.tsx`)
+Change the branch collection logic so each branch node appears only once, but can have **multiple parent connections**.
 
-**1. Collect and position branch nodes (after spine positioning, before rendering)**
-- For each non-spine node with a `spine_gates` array, find the first matching spine node in `posNodes`
-- Position branch nodes to the left and right of their parent spine node, offset horizontally (e.g. alternating sides), with slight vertical jitter to avoid overlap
-- Use a smaller radius (12-14) and the same tier color as the parent
+1. **Deduplicate branch nodes**: Instead of grouping by gate and pushing duplicates, iterate over non-spine nodes once. For each node, collect all matching spine parent positions. Position the node relative to its **first** parent gate (or the midpoint of its parents). Track all parent coordinates.
 
-**2. Draw branch connection lines**
-- For each branch node, draw a line from it to its parent spine node
+2. **Update the BranchNode type**: Change `parentX`/`parentY` to an array of parent positions: `parents: { x: number; y: number }[]`.
 
-**3. Draw branch circles and labels**
-- Render branch nodes as smaller circles with hover tooltips and click-to-navigate (same interaction pattern as spine nodes)
-- Show a truncated title label near each branch node
+3. **Draw multiple connection lines**: When rendering branch connection lines, iterate over `bn.parents` and draw a line from each parent to the branch node.
 
-**4. Update posNodes sort**
-- The current sort assumes all posNodes match `s-(\d+)` — this will crash when branch nodes are added. Fix by sorting spine nodes separately or by guarding the regex match.
-
-### Visual layout
-```text
-              ┌──────────┐
-   [branch]───│  S-03    │───[branch]
-              └──────────┘
-                   │
-              ┌──────────┐
-   [branch]───│  S-02    │───[branch]
-              └──────────┘
-                   │
-              ┌──────────┐
-              │  S-01    │
-              └──────────┘
-```
-
-Branch nodes fan out horizontally from their parent gate, alternating left/right, within the same tier band.
+4. **Result**: One circle per branch node, with dashed lines fanning out to each referenced spine gate.
 
