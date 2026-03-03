@@ -203,7 +203,7 @@ export default function SpineMap() {
         const gateX = startX + (availableWidth / (gates.length + 1)) * (gi + 1);
         posNodes.push({
           id: `gate-${gate}`, label: gate, x: gateX, y: bandCenterY,
-          tier, isGate: true, radius: 18, color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)",
+          tier, isGate: true, radius: 24, color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)",
         });
 
         const branches = branchesByGate.get(gate) ?? [];
@@ -217,7 +217,7 @@ export default function SpineMap() {
           posNodes.push({
             id: branch.id, label: branch.title,
             x: gateX + Math.cos(angle) * arcRadius, y: bandCenterY + Math.sin(angle) * arcRadius,
-            tier, isGate: false, radius: 7,
+            tier, isGate: false, radius: 8,
             color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)", navigateId: branch.id,
           });
         });
@@ -294,14 +294,11 @@ export default function SpineMap() {
       .attr("stroke-width", (d) => d.isGate ? 2 : 0)
       .attr("opacity", (d) => d.isGate ? 1 : 0.8)
       .attr("cursor", (d) => d.isGate ? "default" : "pointer")
-      .on("mouseover", function (_event, d) {
+      .on("mouseover", function (event, d) {
         d3.select(this).attr("r", d.radius * 1.4);
-        const t = zoomTransformRef.current;
-        const screenX = t.applyX(d.x);
-        const screenY = t.applyY(d.y);
         setTooltip({
-          x: screenX,
-          y: screenY,
+          x: event.offsetX,
+          y: event.offsetY,
           text: d.isGate ? `${d.label} — ${TIER_LABELS[d.tier] ?? ""}` : d.label,
         });
       })
@@ -318,7 +315,7 @@ export default function SpineMap() {
       .selectAll("text")
       .data(posNodes.filter((n) => n.isGate)).join("text")
       .text((d) => d.label)
-      .attr("x", (d) => d.x).attr("y", (d) => d.y - 24)
+      .attr("x", (d) => d.x).attr("y", (d) => d.y - 32)
       .attr("font-size", 10).attr("font-weight", 600)
       .attr("fill", "hsl(var(--foreground))").attr("text-anchor", "middle")
       .attr("pointer-events", "none");
