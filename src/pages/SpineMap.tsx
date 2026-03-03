@@ -512,20 +512,6 @@ export default function SpineMap() {
       .delay((_d, i) => i * 40)
       .attr("r", (d) => d.radius);
 
-    // ── Spine node ID labels ──
-    g.append("g")
-      .selectAll("text")
-      .data(spinePositioned).join("text")
-      .text((d) => d.id.toUpperCase())
-      .attr("x", (d) => d.x).attr("y", (d) => d.y - 34)
-      .attr("font-size", 11).attr("font-weight", 700)
-      .attr("fill", "hsl(var(--foreground))")
-      .attr("fill-opacity", (d) => isMatch(d.id) ? 1 : dimOpacity)
-      .attr("text-anchor", "middle")
-      .attr("pointer-events", "none")
-      .attr("opacity", 0)
-      .transition().duration(500).delay((_d, i) => i * 40)
-      .attr("opacity", 1);
 
     // ── Node count badges ──
     const badgeData = spinePositioned
@@ -627,7 +613,7 @@ export default function SpineMap() {
             <svg ref={svgRef} className="w-full" style={{ height: "calc(100vh - 240px)", minHeight: 600 }} />
             {tooltip && (
               <div
-                className="absolute pointer-events-none z-50 px-3 py-1.5 rounded-md bg-popover text-popover-foreground text-xs shadow-lg border border-border max-w-[280px] truncate"
+                className="absolute pointer-events-none z-50 px-3 py-1.5 rounded-md bg-popover text-popover-foreground text-xs shadow-lg border border-border max-w-[280px] whitespace-normal break-words"
                 style={{ left: 0, top: 0, transform: `translate(${tooltip.x + 14}px, ${tooltip.y - 10}px)` }}
               >
                 {tooltip.text}
