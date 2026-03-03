@@ -423,7 +423,7 @@ export default function SpineMap() {
       <div className="px-4 py-6 max-w-[1600px] mx-auto print:px-2 print:py-2">
         <div className="flex items-center justify-between mb-2 print:hidden">
           <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground">
-            Spine Map
+            Vertebrae of Truth
           </h1>
           <Button
             variant="outline"
