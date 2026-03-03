@@ -241,10 +241,57 @@ export default function SpineMap() {
     });
 
     // Re-sort posNodes by spine number for chain lines
-    posNodes.sort((a, b) => {
+    const spinePositioned = [...posNodes].sort((a, b) => {
       const aNum = parseInt(a.id.match(/s-(\d+)/i)![1]);
       const bNum = parseInt(b.id.match(/s-(\d+)/i)![1]);
       return aNum - bNum;
+    });
+
+    // ── 2b. Collect and position branch nodes ──
+    type BranchNode = PosNode & { parentX: number; parentY: number };
+    const branchNodes: BranchNode[] = [];
+    const spineIdSet = new Set(spineNodesMap.keys());
+
+    // Index spine posNodes by id for lookup
+    const spinePosById = new globalThis.Map<string, PosNode>();
+    spinePositioned.forEach((p) => spinePosById.set(p.id.toLowerCase(), p));
+
+    // Group branches per spine gate
+    const branchesPerGate = new globalThis.Map<string, NodeRecord[]>();
+    nodes.forEach((n) => {
+      if (spineIdSet.has(n.id.toLowerCase())) return;
+      const gates = Array.isArray(n.spine_gates) ? n.spine_gates : [];
+      gates.forEach((g: string) => {
+        const key = g.toLowerCase();
+        if (spinePosById.has(key)) {
+          if (!branchesPerGate.has(key)) branchesPerGate.set(key, []);
+          branchesPerGate.get(key)!.push(n);
+        }
+      });
+    });
+
+    branchesPerGate.forEach((branches, gateKey) => {
+      const parent = spinePosById.get(gateKey)!;
+      branches.sort((a, b) => a.title.localeCompare(b.title));
+      branches.forEach((b, i) => {
+        const side = i % 2 === 0 ? -1 : 1;
+        const col = Math.floor(i / 2);
+        const xOffset = (col + 1) * 110 * side;
+        const yJitter = (i % 3 - 1) * 18;
+        branchNodes.push({
+          id: b.id,
+          label: b.title,
+          x: parent.x + xOffset,
+          y: parent.y + yJitter,
+          tier: b.tier ?? parent.tier,
+          isSpine: false,
+          radius: 13,
+          color: TIER_COLORS[b.tier ?? parent.tier] ?? "hsl(0, 0%, 50%)",
+          navigateId: b.id,
+          parentX: parent.x,
+          parentY: parent.y,
+        });
+      });
     });
 
     // ── 3. Render ──
@@ -279,9 +326,9 @@ export default function SpineMap() {
     }
 
     // ── Spine chain lines ──
-    for (let i = 0; i < posNodes.length - 1; i++) {
-      const a = posNodes[i];
-      const b = posNodes[i + 1];
+    for (let i = 0; i < spinePositioned.length - 1; i++) {
+      const a = spinePositioned[i];
+      const b = spinePositioned[i + 1];
       g.append("line")
         .attr("x1", a.x).attr("y1", a.y)
         .attr("x2", b.x).attr("y2", b.y)
@@ -290,10 +337,54 @@ export default function SpineMap() {
         .attr("stroke-opacity", 0.25);
     }
 
+    // ── Branch connection lines ──
+    branchNodes.forEach((bn) => {
+      g.append("line")
+        .attr("x1", bn.parentX).attr("y1", bn.parentY)
+        .attr("x2", bn.x).attr("y2", bn.y)
+        .attr("stroke", bn.color)
+        .attr("stroke-width", 1.2)
+        .attr("stroke-opacity", 0.35)
+        .attr("stroke-dasharray", "4 3");
+    });
+
+    // ── Branch node circles ──
+    g.append("g")
+      .selectAll<SVGCircleElement, BranchNode>("circle")
+      .data(branchNodes).join("circle")
+      .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", (d) => d.radius)
+      .attr("fill", (d) => d.color)
+      .attr("fill-opacity", 0.85)
+      .attr("stroke", "hsl(var(--foreground))")
+      .attr("stroke-width", 1.2)
+      .attr("cursor", "pointer")
+      .on("mouseover", function (event, d) {
+        d3.select(this).attr("r", d.radius * 1.4);
+        setTooltip({ x: event.offsetX, y: event.offsetY, text: d.label });
+      })
+      .on("mouseout", function (_event, d) {
+        d3.select(this).attr("r", d.radius);
+        setTooltip(null);
+      })
+      .on("click", (_event, d) => {
+        navigate(`/node/${d.navigateId}`);
+      });
+
+    // ── Branch node labels ──
+    g.append("g")
+      .selectAll("text")
+      .data(branchNodes).join("text")
+      .text((d) => d.label.length > 18 ? d.label.slice(0, 16) + "…" : d.label)
+      .attr("x", (d) => d.x).attr("y", (d) => d.y - 18)
+      .attr("font-size", 9).attr("font-weight", 500)
+      .attr("fill", "hsl(var(--foreground))").attr("fill-opacity", 0.7)
+      .attr("text-anchor", "middle")
+      .attr("pointer-events", "none");
+
     // ── Spine node circles ──
     g.append("g")
       .selectAll<SVGCircleElement, PosNode>("circle")
-      .data(posNodes).join("circle")
+      .data(spinePositioned).join("circle")
       .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", (d) => d.radius)
       .attr("fill", (d) => d.color)
       .attr("stroke", "hsl(var(--foreground))")
@@ -314,7 +405,7 @@ export default function SpineMap() {
     // ── Spine node labels ──
     g.append("g")
       .selectAll("text")
-      .data(posNodes).join("text")
+      .data(spinePositioned).join("text")
       .text((d) => d.id.toUpperCase())
       .attr("x", (d) => d.x).attr("y", (d) => d.y - 34)
       .attr("font-size", 11).attr("font-weight", 700)
