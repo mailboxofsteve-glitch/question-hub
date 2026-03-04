@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import * as d3 from "d3";
 import { Printer, Map, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import NodeDetailContent from "@/components/NodeDetailContent";
 
 interface NodeRecord {
   id: string;
@@ -114,7 +116,7 @@ export default function SpineMap() {
   const [collapsedTiers, setCollapsedTiers] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const navigate = useNavigate();
+  const [overlayNodeId, setOverlayNodeId] = useState<string | null>(null);
 
   const toggleTier = useCallback((tier: number) => {
     setCollapsedTiers((prev) => {
@@ -557,7 +559,7 @@ export default function SpineMap() {
       })
       .on("click", (_event, d) => {
         if (selectedNodeId === d.navigateId) {
-          navigate(`/node/${d.navigateId}`);
+          setOverlayNodeId(d.navigateId);
         } else {
           setSelectedNodeId(d.navigateId);
         }
@@ -613,7 +615,7 @@ export default function SpineMap() {
       })
       .on("click", (_event, d) => {
         if (selectedNodeId === d.navigateId) {
-          navigate(`/node/${d.navigateId}`);
+          setOverlayNodeId(d.navigateId);
         } else {
           setSelectedNodeId(d.navigateId);
         }
@@ -665,7 +667,7 @@ export default function SpineMap() {
       badgeG.transition().duration(400).delay((_d, i) => 600 + i * 40).attr("opacity", 1);
     }
 
-  }, [nodes, navigate, showPrintView, collapsedTiers, matchingIds, toggleTier, branchCountBySpine, ancestorPathIds, selectedNodeId]);
+  }, [nodes, showPrintView, collapsedTiers, matchingIds, toggleTier, branchCountBySpine, ancestorPathIds, selectedNodeId]);
 
   return (
     <AppLayout>
@@ -745,6 +747,21 @@ export default function SpineMap() {
           </div>
         )}
       </div>
+
+      {/* Node detail overlay */}
+      <Dialog open={!!overlayNodeId} onOpenChange={(open) => { if (!open) setOverlayNodeId(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] p-0 gap-0 overflow-hidden">
+          <DialogTitle className="sr-only">Node Detail</DialogTitle>
+          <ScrollArea className="max-h-[85vh] p-6">
+            {overlayNodeId && (
+              <NodeDetailContent
+                id={overlayNodeId}
+                onNavigateNode={(nodeId) => setOverlayNodeId(nodeId)}
+              />
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
