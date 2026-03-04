@@ -1,43 +1,31 @@
 
 
-## Fix Hub/Branch Node Positioning
+## Highlight Node Hierarchy on Click
 
-### Two bugs to fix in `src/pages/SpineMap.tsx`
+### Behavior
+1. **First click** on any node: highlights the full ancestor path to that node. For a branch node like `test-node`, this traces back through its `spine_gates` parent, then that parent's parent, and so on up to the root spine chain. All spine nodes in the chain up to the relevant ancestor are also highlighted.
+2. **Second click** on the same (already-highlighted) node: navigates to `/node/:id` as before.
+3. **Escape key** to deselect: clears the highlighted path and returns to normal view. This is intuitive — Escape universally means "cancel/dismiss" — and is not consumed by browsers for anything disruptive on a normal page.
 
-**Bug 1: Hub nodes lose their own parent connections**
-`what-is-a-worldview` has `spine_gates: ["S-05"]` — it's a branch of S-05. But because `test-node` references it as a gate, the code reclassifies it as a "hub" and removes it from the branch candidate list (line 375). It gets positioned in tier 0 but loses its connection line to S-05.
+### Visual treatment when a path is active
+- All nodes and lines NOT in the path are dimmed (same `dimOpacity` used by search).
+- Nodes and connection lines IN the path get full opacity + a gold highlight ring (similar to search match styling).
+- The spine chain lines between spine nodes in the path are also highlighted.
 
-**Fix**: Don't separate hub nodes from branch processing. Instead, use a two-step approach:
-- First, process ALL non-spine nodes as branches (existing logic), positioning them relative to their parents and adding connection lines.
-- After all branches are positioned, add each branch to `posById` so other branches can reference them as parents.
-- Then do a second pass for any branch whose gates weren't found in the first pass (because the gate was itself a branch that needed positioning first).
+### Technical approach (single file: `src/pages/SpineMap.tsx`)
 
-**Bug 2: Branch nodes positioned at parent's Y instead of own tier**
-Currently line 401: `y: parentPos.y + yJitter` — this places the branch at the parent's vertical position. For cross-tier connections (test-node in tier 3 → what-is-a-worldview in tier 0), the branch should be in its OWN tier band, with a connection line drawn back to the parent.
+1. **New state**: `selectedNodeId: string | null` — tracks which node's path is being shown.
 
-**Fix**: Position branch nodes in their own tier band's Y range, not at the parent's Y. Use the parent's position only for the connection line endpoint, and for X offset calculation. The Y position should come from `tierBandY(bTier)`.
+2. **Compute ancestor path** (`useMemo`): Given `selectedNodeId` and the `nodes` array, walk up the `spine_gates` chain to build a `Set<string>` of all ancestor IDs. Also include all spine nodes from S-01 up to the highest spine node in the chain (since spine nodes form a sequential chain). Returns `null` when no node is selected.
 
-### Revised approach (simpler)
+3. **Modify click handlers**: Both spine and branch circle `.on("click")` handlers check if the clicked node is already selected → navigate. Otherwise → set `selectedNodeId`.
 
-Replace the 3-pass system with:
+4. **Escape key listener**: `useEffect` that adds a `keydown` listener for Escape, calling `setSelectedNodeId(null)`. Cleanup on unmount.
 
-1. **Pass 1 — Spine nodes** (unchanged): Position spine nodes, add to `posById`.
+5. **Modify rendering opacity logic**: The existing `isMatch` function already handles dimming. Add a similar `isInPath` check. When a path is active, it takes priority over search for dimming purposes. Nodes in the path get full opacity + gold stroke; others get dimmed.
 
-2. **Pass 2 — All non-spine nodes, multi-round**: 
-   - Round 1: Try to position every non-spine node. For each, look up its `spine_gates` in `posById`. If found, position it in its **own tier band** (Y from tier band, X offset from parent), draw connection line to parent, and add it to `posById`.
-   - Round 2: Retry any nodes that failed in round 1 (their gate may now be in `posById` after round 1 positioned it). Repeat until no more nodes can be placed or all are placed.
-   
-   This naturally handles chains: S-05 → what-is-a-worldview → test-node. Round 1 places what-is-a-worldview (gate S-05 exists). Round 2 places test-node (gate what-is-a-worldview now exists).
-
-3. **Y positioning for branches**: Use the node's own tier band for vertical placement. Calculate Y within `tierBandY(bTier)` range. X offset still relative to parent for visual grouping, but with the connection line spanning tiers if needed.
-
-### Key details
-- Remove the separate hub node concept entirely — all non-spine nodes are branches
-- Each branch is placed in its own tier's Y band
-- Connection lines are drawn from the branch to whichever parent node it references (can cross tiers)
-- After positioning each branch, add it to `posById` so downstream nodes can find it
-- Use iterative rounds (max ~5) to resolve chains
+6. **Update description text**: When a path is active, show a hint like "Press Esc to clear selection" in the subtitle area.
 
 ### File changed
-- `src/pages/SpineMap.tsx` — replace Pass 2 (hub nodes) and Pass 3 (branch nodes) with the unified multi-round branch positioning system
+- `src/pages/SpineMap.tsx`
 
