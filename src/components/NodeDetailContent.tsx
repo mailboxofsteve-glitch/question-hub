@@ -63,9 +63,13 @@ interface NodeDetailContentProps {
   id: string;
   /** Called when user clicks a related question link (e.g. to open it in the same overlay) */
   onNavigateNode?: (nodeId: string) => void;
+  /** When true, enables scroll/expand tracking for diagnostic gating */
+  diagnosticMode?: boolean;
+  /** Callback reporting whether user has engaged enough to unlock Disagree/IDK */
+  onDiagnosticReady?: (ready: boolean) => void;
 }
 
-const NodeDetailContent = ({ id, onNavigateNode }: NodeDetailContentProps) => {
+const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticReady }: NodeDetailContentProps) => {
   const { toast } = useToast();
   const { addItem } = useRecentlyViewed();
 
