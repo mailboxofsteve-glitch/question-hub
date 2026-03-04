@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      diagnostic_progress: {
+        Row: {
+          created_at: string | null
+          id: string
+          node_id: string
+          note: string | null
+          response: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          node_id: string
+          note?: string | null
+          response: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          node_id?: string
+          note?: string | null
+          response?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           created_at: string
