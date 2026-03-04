@@ -313,97 +313,72 @@ export default function SpineMap() {
       return aNum - bNum;
     });
 
-    // ── Shared position map (spine + hub nodes) ──
+    // ── Shared position map ──
     const posById = new globalThis.Map<string, PosNode>();
     spinePositioned.forEach((p) => posById.set(p.id.toLowerCase(), p));
 
     const spineIdSet = new Set(spineNodesMap.keys());
-    const allNodesById = new globalThis.Map<string, NodeRecord>();
-    nodes.forEach((n) => allNodesById.set(n.id.toLowerCase(), n));
 
-    // ── Pass 2: Hub nodes (non-spine nodes referenced as gates) ──
-    const hubNodeIds = new Set<string>();
-    const nonSpineNodes = nodes.filter((n) => !spineIdSet.has(n.id.toLowerCase()));
-    nonSpineNodes.forEach((n) => {
-      const gates = Array.isArray(n.spine_gates) ? n.spine_gates : [];
-      gates.forEach((g: string) => {
-        const key = g.toLowerCase();
-        if (!posById.has(key) && allNodesById.has(key)) {
-          hubNodeIds.add(key);
-        }
-      });
-    });
-
-    // Position hub nodes within their tier bands
-    const hubsByTier = new globalThis.Map<number, string[]>();
-    hubNodeIds.forEach((hid) => {
-      const node = allNodesById.get(hid)!;
-      const tier = node.tier ?? 0;
-      if (collapsedTiers.has(tier)) return;
-      if (!hubsByTier.has(tier)) hubsByTier.set(tier, []);
-      hubsByTier.get(tier)!.push(hid);
-    });
-
-    hubsByTier.forEach((hubs, tier) => {
-      const bh = bandHeight(tier);
-      const bandTop = tierBandY(tier) + 30;
-      const bandBottom = tierBandY(tier) + bh - 30;
-      hubs.forEach((hid, i) => {
-        const node = allNodesById.get(hid)!;
-        const y = hubs.length === 1
-          ? (bandTop + bandBottom) / 2
-          : bandTop + (bandBottom - bandTop) * (i / (hubs.length - 1));
-        // Offset hubs to the right of spine column
-        const xOffset = 160 + i * 60;
-        const hubPos: PosNode = {
-          id: node.id, label: node.title,
-          x: spineX + xOffset, y,
-          tier, isSpine: false, radius: 20,
-          color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)",
-          navigateId: node.id,
-        };
-        posNodes.push(hubPos);
-        posById.set(hid, hubPos);
-      });
-    });
-
-    // ── Pass 3: Branch nodes ──
+    // ── Pass 2: All non-spine nodes, multi-round ──
     type BranchNode = PosNode & { parents: { x: number; y: number }[] };
     const branchNodes: BranchNode[] = [];
     const gateChildCount = new globalThis.Map<string, number>();
 
-    const branchCandidates = nonSpineNodes.filter((n) => !hubNodeIds.has(n.id.toLowerCase()));
+    let remaining = nodes.filter((n) => !spineIdSet.has(n.id.toLowerCase()));
+    const maxRounds = 5;
 
-    branchCandidates.forEach((b) => {
-      const bTier = b.tier ?? 0;
-      if (collapsedTiers.has(bTier)) return;
+    for (let round = 0; round < maxRounds; round++) {
+      const stillUnplaced: typeof remaining = [];
 
-      const gates = Array.isArray(b.spine_gates) ? b.spine_gates : [];
-      const parents: { x: number; y: number }[] = [];
-      gates.forEach((g: string) => {
-        const pos = posById.get(g.toLowerCase());
-        if (pos) parents.push({ x: pos.x, y: pos.y });
+      remaining.forEach((b) => {
+        const bTier = b.tier ?? 0;
+        if (collapsedTiers.has(bTier)) return; // skip collapsed
+
+        const gates = Array.isArray(b.spine_gates) ? b.spine_gates : [];
+        const parents: { x: number; y: number }[] = [];
+        gates.forEach((g: string) => {
+          const pos = posById.get(g.toLowerCase());
+          if (pos) parents.push({ x: pos.x, y: pos.y });
+        });
+
+        if (parents.length === 0) {
+          // Parent not positioned yet — retry next round
+          stillUnplaced.push(b);
+          return;
+        }
+
+        const firstGateKey = gates[0].toLowerCase();
+        const idx = gateChildCount.get(firstGateKey) ?? 0;
+        gateChildCount.set(firstGateKey, idx + 1);
+
+        const parentPos = posById.get(firstGateKey)!;
+        const side = idx % 2 === 0 ? -1 : 1;
+        const col = Math.floor(idx / 2);
+        const xOffset = (col + 1) * 110 * side;
+
+        // Y from the node's OWN tier band, not the parent's
+        const bh = bandHeight(bTier);
+        const bandTop = tierBandY(bTier) + 30;
+        const bandBottom = tierBandY(bTier) + bh - 30;
+        const ySlot = (idx % 5) / 4; // spread within band
+        const y = bandTop + (bandBottom - bandTop) * ySlot;
+
+        const branch: BranchNode = {
+          id: b.id, label: b.title,
+          x: parentPos.x + xOffset, y,
+          tier: bTier, isSpine: false, radius: 13,
+          color: TIER_COLORS[bTier] ?? "hsl(0, 0%, 50%)",
+          navigateId: b.id, parents,
+        };
+        branchNodes.push(branch);
+        posNodes.push(branch);
+        // Add to posById so downstream nodes can reference this as a parent
+        posById.set(b.id.toLowerCase(), branch);
       });
-      if (parents.length === 0) return;
 
-      const firstGateKey = gates[0].toLowerCase();
-      const idx = gateChildCount.get(firstGateKey) ?? 0;
-      gateChildCount.set(firstGateKey, idx + 1);
-
-      const parentPos = posById.get(firstGateKey)!;
-      const side = idx % 2 === 0 ? -1 : 1;
-      const col = Math.floor(idx / 2);
-      const xOffset = (col + 1) * 110 * side;
-      const yJitter = (idx % 3 - 1) * 18;
-
-      branchNodes.push({
-        id: b.id, label: b.title,
-        x: parentPos.x + xOffset, y: parentPos.y + yJitter,
-        tier: bTier, isSpine: false, radius: 13,
-        color: TIER_COLORS[bTier] ?? "hsl(0, 0%, 50%)",
-        navigateId: b.id, parents,
-      });
-    });
+      remaining = stillUnplaced;
+      if (remaining.length === 0) break;
+    }
 
     // ── 3. Render ──
     const svg = d3.select(svgRef.current);
