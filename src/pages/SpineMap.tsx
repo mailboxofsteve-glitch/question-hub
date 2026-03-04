@@ -313,25 +313,75 @@ export default function SpineMap() {
       return aNum - bNum;
     });
 
-    // ── 2b. Collect and position branch nodes ──
+    // ── Shared position map (spine + hub nodes) ──
+    const posById = new globalThis.Map<string, PosNode>();
+    spinePositioned.forEach((p) => posById.set(p.id.toLowerCase(), p));
+
+    const spineIdSet = new Set(spineNodesMap.keys());
+    const allNodesById = new globalThis.Map<string, NodeRecord>();
+    nodes.forEach((n) => allNodesById.set(n.id.toLowerCase(), n));
+
+    // ── Pass 2: Hub nodes (non-spine nodes referenced as gates) ──
+    const hubNodeIds = new Set<string>();
+    const nonSpineNodes = nodes.filter((n) => !spineIdSet.has(n.id.toLowerCase()));
+    nonSpineNodes.forEach((n) => {
+      const gates = Array.isArray(n.spine_gates) ? n.spine_gates : [];
+      gates.forEach((g: string) => {
+        const key = g.toLowerCase();
+        if (!posById.has(key) && allNodesById.has(key)) {
+          hubNodeIds.add(key);
+        }
+      });
+    });
+
+    // Position hub nodes within their tier bands
+    const hubsByTier = new globalThis.Map<number, string[]>();
+    hubNodeIds.forEach((hid) => {
+      const node = allNodesById.get(hid)!;
+      const tier = node.tier ?? 0;
+      if (collapsedTiers.has(tier)) return;
+      if (!hubsByTier.has(tier)) hubsByTier.set(tier, []);
+      hubsByTier.get(tier)!.push(hid);
+    });
+
+    hubsByTier.forEach((hubs, tier) => {
+      const bh = bandHeight(tier);
+      const bandTop = tierBandY(tier) + 30;
+      const bandBottom = tierBandY(tier) + bh - 30;
+      hubs.forEach((hid, i) => {
+        const node = allNodesById.get(hid)!;
+        const y = hubs.length === 1
+          ? (bandTop + bandBottom) / 2
+          : bandTop + (bandBottom - bandTop) * (i / (hubs.length - 1));
+        // Offset hubs to the right of spine column
+        const xOffset = 160 + i * 60;
+        const hubPos: PosNode = {
+          id: node.id, label: node.title,
+          x: spineX + xOffset, y,
+          tier, isSpine: false, radius: 20,
+          color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)",
+          navigateId: node.id,
+        };
+        posNodes.push(hubPos);
+        posById.set(hid, hubPos);
+      });
+    });
+
+    // ── Pass 3: Branch nodes ──
     type BranchNode = PosNode & { parents: { x: number; y: number }[] };
     const branchNodes: BranchNode[] = [];
-    const spineIdSet = new Set(spineNodesMap.keys());
-
-    const spinePosById = new globalThis.Map<string, PosNode>();
-    spinePositioned.forEach((p) => spinePosById.set(p.id.toLowerCase(), p));
-
-    const branchCandidates = nodes.filter((n) => !spineIdSet.has(n.id.toLowerCase()));
     const gateChildCount = new globalThis.Map<string, number>();
+
+    const branchCandidates = nonSpineNodes.filter((n) => !hubNodeIds.has(n.id.toLowerCase()));
 
     branchCandidates.forEach((b) => {
       const bTier = b.tier ?? 0;
-      if (collapsedTiers.has(bTier)) return; // skip collapsed tiers
+      if (collapsedTiers.has(bTier)) return;
 
       const gates = Array.isArray(b.spine_gates) ? b.spine_gates : [];
       const parents: { x: number; y: number }[] = [];
       gates.forEach((g: string) => {
-        const pos = spinePosById.get(g.toLowerCase());
+        const pos = posById.get(g.toLowerCase());
         if (pos) parents.push({ x: pos.x, y: pos.y });
       });
       if (parents.length === 0) return;
@@ -340,7 +390,7 @@ export default function SpineMap() {
       const idx = gateChildCount.get(firstGateKey) ?? 0;
       gateChildCount.set(firstGateKey, idx + 1);
 
-      const parentPos = spinePosById.get(firstGateKey)!;
+      const parentPos = posById.get(firstGateKey)!;
       const side = idx % 2 === 0 ? -1 : 1;
       const col = Math.floor(idx / 2);
       const xOffset = (col + 1) * 110 * side;
