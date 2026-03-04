@@ -113,6 +113,7 @@ export default function SpineMap() {
   const [showPrintView, setShowPrintView] = useState(false);
   const [collapsedTiers, setCollapsedTiers] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const toggleTier = useCallback((tier: number) => {
@@ -220,6 +221,61 @@ export default function SpineMap() {
     });
     return ids;
   }, [searchQuery, nodes]);
+
+  // Compute ancestor path for selected node
+  const ancestorPathIds = useMemo(() => {
+    if (!selectedNodeId || !nodes) return null;
+    const nodeMap = new globalThis.Map<string, NodeRecord>();
+    nodes.forEach((n) => nodeMap.set(n.id.toLowerCase(), n));
+
+    const pathSet = new Set<string>();
+    const spinePattern = /^s-(\d+)$/i;
+
+    // Walk up the spine_gates chain
+    let currentId = selectedNodeId.toLowerCase();
+    while (currentId) {
+      pathSet.add(currentId);
+      const node = nodeMap.get(currentId);
+      if (!node) break;
+      const gates = Array.isArray(node.spine_gates) ? node.spine_gates : [];
+      if (gates.length === 0) break;
+      const parentId = gates[0].toLowerCase();
+      if (pathSet.has(parentId)) break; // prevent cycles
+      currentId = parentId;
+    }
+
+    // Find the highest spine node in the path and include all spine nodes from S-01 up to it
+    let maxSpineNum = -1;
+    pathSet.forEach((id) => {
+      const m = id.match(spinePattern);
+      if (m) {
+        const num = parseInt(m[1]);
+        if (num > maxSpineNum) maxSpineNum = num;
+      }
+    });
+
+    if (maxSpineNum >= 0) {
+      // Add all spine nodes from S-01 up to maxSpineNum
+      nodes.forEach((n) => {
+        const m = n.id.match(spinePattern);
+        if (m) {
+          const num = parseInt(m[1]);
+          if (num <= maxSpineNum) pathSet.add(n.id.toLowerCase());
+        }
+      });
+    }
+
+    return pathSet;
+  }, [selectedNodeId, nodes]);
+
+  // Escape key to deselect
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedNodeId(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   useEffect(() => {
     if (!nodes || !svgRef.current || !containerRef.current || showPrintView) return;
@@ -395,8 +451,17 @@ export default function SpineMap() {
       });
     svg.call(zoom);
 
-    // Helper: is node matched by search?
-    const isMatch = (id: string) => matchingIds === null || matchingIds.has(id.toLowerCase());
+    // Helper: is node highlighted?
+    const isInPath = (id: string) => ancestorPathIds !== null && ancestorPathIds.has(id.toLowerCase());
+    const hasActivePath = ancestorPathIds !== null;
+    const isMatch = (id: string) => {
+      if (hasActivePath) return isInPath(id);
+      return matchingIds === null || matchingIds.has(id.toLowerCase());
+    };
+    const isGoldHighlight = (id: string) => {
+      if (hasActivePath) return isInPath(id);
+      return matchingIds !== null && matchingIds.has(id.toLowerCase());
+    };
     const dimOpacity = 0.12;
 
     // Tier bands (clickable labels for collapse/expand)
@@ -442,24 +507,26 @@ export default function SpineMap() {
       const a = spinePositioned[i];
       const b = spinePositioned[i + 1];
       const bothMatch = isMatch(a.id) && isMatch(b.id);
+      const bothGold = isGoldHighlight(a.id) && isGoldHighlight(b.id);
       g.append("line")
         .attr("x1", a.x).attr("y1", a.y)
         .attr("x2", b.x).attr("y2", b.y)
-        .attr("stroke", "hsl(var(--foreground))")
-        .attr("stroke-width", 2)
-        .attr("stroke-opacity", bothMatch ? 0.25 : dimOpacity);
+        .attr("stroke", bothGold ? "hsl(45, 100%, 60%)" : "hsl(var(--foreground))")
+        .attr("stroke-width", bothGold ? 3 : 2)
+        .attr("stroke-opacity", bothMatch ? (bothGold ? 0.7 : 0.25) : dimOpacity);
     }
 
     // ── Branch connection lines ──
     branchNodes.forEach((bn) => {
       const bnMatch = isMatch(bn.id);
+      const bnGold = isGoldHighlight(bn.id);
       bn.parents.forEach((parent) => {
         g.append("line")
           .attr("x1", parent.x).attr("y1", parent.y)
           .attr("x2", bn.x).attr("y2", bn.y)
-          .attr("stroke", bn.color)
-          .attr("stroke-width", 1.2)
-          .attr("stroke-opacity", bnMatch ? 0.35 : dimOpacity)
+          .attr("stroke", bnGold ? "hsl(45, 100%, 60%)" : bn.color)
+          .attr("stroke-width", bnGold ? 2.5 : 1.2)
+          .attr("stroke-opacity", bnMatch ? (bnGold ? 0.7 : 0.35) : dimOpacity)
           .attr("stroke-dasharray", "4 3");
       });
     });
@@ -468,14 +535,11 @@ export default function SpineMap() {
     const branchCircles = g.append("g")
       .selectAll<SVGCircleElement, BranchNode>("circle")
       .data(branchNodes).join("circle")
-      .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", 0) // start at 0 for animation
+      .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", 0)
       .attr("fill", (d) => d.color)
       .attr("fill-opacity", (d) => isMatch(d.id) ? 0.85 : dimOpacity)
-      .attr("stroke", (d) => {
-        if (matchingIds && matchingIds.has(d.id.toLowerCase())) return "hsl(var(--foreground))";
-        return "hsl(var(--foreground))";
-      })
-      .attr("stroke-width", (d) => matchingIds && matchingIds.has(d.id.toLowerCase()) ? 2.5 : 1.2)
+      .attr("stroke", (d) => isGoldHighlight(d.id) ? "hsl(45, 100%, 60%)" : "hsl(var(--foreground))")
+      .attr("stroke-width", (d) => isGoldHighlight(d.id) ? 2.5 : 1.2)
       .attr("cursor", "pointer")
       .on("mouseover", function (event, d) {
         d3.select(this).transition().duration(150).attr("r", d.radius * 1.4);
@@ -485,7 +549,13 @@ export default function SpineMap() {
         d3.select(this).transition().duration(150).attr("r", d.radius);
         setTooltip(null);
       })
-      .on("click", (_event, d) => navigate(`/node/${d.navigateId}`));
+      .on("click", (_event, d) => {
+        if (selectedNodeId === d.navigateId) {
+          navigate(`/node/${d.navigateId}`);
+        } else {
+          setSelectedNodeId(d.navigateId);
+        }
+      });
 
     // Animate branch circles in
     branchCircles.transition()
@@ -512,14 +582,11 @@ export default function SpineMap() {
     const spineCircles = g.append("g")
       .selectAll<SVGCircleElement, PosNode>("circle")
       .data(spinePositioned).join("circle")
-      .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", 0) // start at 0
+      .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", 0)
       .attr("fill", (d) => d.color)
       .attr("fill-opacity", (d) => isMatch(d.id) ? 1 : dimOpacity)
-      .attr("stroke", (d) => {
-        if (matchingIds && matchingIds.has(d.id.toLowerCase())) return "hsl(45, 100%, 60%)";
-        return "hsl(var(--foreground))";
-      })
-      .attr("stroke-width", (d) => matchingIds && matchingIds.has(d.id.toLowerCase()) ? 3 : 2)
+      .attr("stroke", (d) => isGoldHighlight(d.id) ? "hsl(45, 100%, 60%)" : "hsl(var(--foreground))")
+      .attr("stroke-width", (d) => isGoldHighlight(d.id) ? 3 : 2)
       .attr("cursor", "pointer")
       .on("mouseover", function (event, d) {
         d3.select(this).transition().duration(150).attr("r", d.radius * 1.3);
@@ -529,7 +596,13 @@ export default function SpineMap() {
         d3.select(this).transition().duration(150).attr("r", d.radius);
         setTooltip(null);
       })
-      .on("click", (_event, d) => navigate(`/node/${d.navigateId}`));
+      .on("click", (_event, d) => {
+        if (selectedNodeId === d.navigateId) {
+          navigate(`/node/${d.navigateId}`);
+        } else {
+          setSelectedNodeId(d.navigateId);
+        }
+      });
 
     // Staggered fade-in from bottom to top
     spineCircles.transition()
@@ -569,7 +642,7 @@ export default function SpineMap() {
 
     badgeG.transition().duration(400).delay((_d, i) => 600 + i * 40).attr("opacity", 1);
 
-  }, [nodes, navigate, showPrintView, collapsedTiers, matchingIds, toggleTier, branchCountBySpine]);
+  }, [nodes, navigate, showPrintView, collapsedTiers, matchingIds, toggleTier, branchCountBySpine, ancestorPathIds, selectedNodeId]);
 
   return (
     <AppLayout>
@@ -605,9 +678,11 @@ export default function SpineMap() {
         <h1 className="hidden print:block text-xl font-bold mb-4">Spine Map — Node Listing</h1>
 
         <p className="text-muted-foreground text-sm mb-4 print:hidden">
-          {showPrintView
+          {selectedNodeId
+            ? "Path highlighted — click the selected node again to open it. Press Esc to clear."
+            : showPrintView
             ? "Printable listing of all nodes grouped by tier and spine gate."
-            : "Vertical tier layout — click a tier label to collapse/expand. Click a node to view it."}
+            : "Vertical tier layout — click a tier label to collapse/expand. Click a node to highlight its path."}
         </p>
 
         {/* Legend — hide in print */}
