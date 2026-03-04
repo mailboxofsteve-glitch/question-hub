@@ -1,26 +1,31 @@
 
 
-## Fix: Preserve Zoom Position on Node Click
+## Node Detail Overlay on Graph Page
 
-### Root Cause
-The D3 rendering `useEffect` (line 645) includes `selectedNodeId` and `ancestorPathIds` in its dependency array. When a user clicks a node, `setSelectedNodeId` fires, the entire SVG is torn down and rebuilt, and the zoom resets to the identity transform — snapping back to the default view.
+### Approach
+Instead of navigating to `/node/:id` on second click, open a modal overlay on the graph page that displays the node's full content. This keeps the user in context of the graph with their current zoom/selection intact.
 
-The `zoomTransformRef` already saves the current transform on every zoom event (line 450), but after the graph rebuilds, this saved transform is never applied.
+### Implementation
 
-### Fix (single file: `src/pages/SpineMap.tsx`)
+**1. Extract reusable `NodeDetailContent` component**
+- Create `src/components/NodeDetailContent.tsx` — extract the inner content from `NodeDetail.tsx` (the query, rendering of layer1/layer2/layer3, sources, related questions) into a standalone component that accepts an `id` prop.
+- Remove `AppLayout` wrapper, reading progress bar, and breadcrumb from this extracted version (those are page-level concerns).
+- Keep the share button, title, category badge, layer content, reasoning accordion, next steps, and sources.
+- `NodeDetail.tsx` then imports and wraps `NodeDetailContent` with `AppLayout` + progress bar + breadcrumb (preserving existing page behavior).
 
-After `svg.call(zoom)` (line 452), add one line to restore the saved zoom transform:
+**2. Add overlay state to `SpineMap.tsx`**
+- New state: `overlayNodeId: string | null`.
+- On second click (when `selectedNodeId === d.navigateId`), set `overlayNodeId = d.navigateId` instead of calling `navigate()`.
+- Render a `Dialog` (from existing `@radix-ui/react-dialog` UI component) containing `NodeDetailContent` when `overlayNodeId` is set.
+- The Dialog's built-in X close button handles dismissal. On close, clear `overlayNodeId` but keep `selectedNodeId` so the path stays highlighted.
+- Escape key: when overlay is open, Dialog captures Escape to close itself (Radix default). When overlay is closed, the existing Escape handler clears the path selection — no conflict.
 
-```ts
-svg.call(zoom.transform, zoomTransformRef.current);
-```
+**3. Dialog styling**
+- Use `DialogContent` with custom sizing: `max-w-2xl max-h-[85vh]` with `overflow-y-auto` for scrollable content.
+- The existing Dialog component already includes the X close button in the top-right corner.
 
-This tells D3 to apply the previously saved transform to the new SVG/group, so the graph stays at the user's current pan and zoom position after a click-triggered re-render.
-
-Additionally, skip the initial fade-in transitions when restoring a zoom (i.e., when the transform is not the identity). This prevents the jarring effect of elements fading in while the user is zoomed into a specific area. This can be done by checking `!zoomTransformRef.current.k || zoomTransformRef.current.k === 1` to decide whether to apply `.transition().duration(400)` or set elements to full opacity immediately.
-
-### Summary
-- One line added after `svg.call(zoom)` to restore the saved transform
-- Conditional skip of fade-in animations on re-renders (not initial load)
-- No structural changes to the rendering logic
+### Files changed
+- **New**: `src/components/NodeDetailContent.tsx` — extracted node content component
+- **Modified**: `src/pages/NodeDetail.tsx` — refactored to use `NodeDetailContent`
+- **Modified**: `src/pages/SpineMap.tsx` — add overlay state, Dialog rendering, modify second-click behavior
 
