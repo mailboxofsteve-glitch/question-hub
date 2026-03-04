@@ -451,6 +451,12 @@ export default function SpineMap() {
       });
     svg.call(zoom);
 
+    // Restore saved zoom transform so clicking a node doesn't reset the view
+    const isRestoringZoom = zoomTransformRef.current.k !== 1 || zoomTransformRef.current.x !== 0 || zoomTransformRef.current.y !== 0;
+    if (isRestoringZoom) {
+      svg.call(zoom.transform, zoomTransformRef.current);
+    }
+
     // Helper: is node highlighted?
     const isInPath = (id: string) => ancestorPathIds !== null && ancestorPathIds.has(id.toLowerCase());
     const hasActivePath = ancestorPathIds !== null;
@@ -558,13 +564,17 @@ export default function SpineMap() {
       });
 
     // Animate branch circles in
-    branchCircles.transition()
-      .duration(400)
-      .delay((_d, i) => 300 + i * 8)
-      .attr("r", (d) => d.radius);
+    if (isRestoringZoom) {
+      branchCircles.attr("r", (d) => d.radius);
+    } else {
+      branchCircles.transition()
+        .duration(400)
+        .delay((_d, i) => 300 + i * 8)
+        .attr("r", (d) => d.radius);
+    }
 
     // ── Branch node labels ──
-    g.append("g")
+    const branchLabels = g.append("g")
       .selectAll("text")
       .data(branchNodes).join("text")
       .text((d) => d.label.length > 18 ? d.label.slice(0, 16) + "…" : d.label)
@@ -573,10 +583,15 @@ export default function SpineMap() {
       .attr("fill", "hsl(var(--foreground))")
       .attr("fill-opacity", (d) => isMatch(d.id) ? 0.7 : dimOpacity)
       .attr("text-anchor", "middle")
-      .attr("pointer-events", "none")
-      .attr("opacity", 0)
-      .transition().duration(400).delay((_d, i) => 300 + i * 8)
-      .attr("opacity", 1);
+      .attr("pointer-events", "none");
+
+    if (isRestoringZoom) {
+      branchLabels.attr("opacity", 1);
+    } else {
+      branchLabels.attr("opacity", 0)
+        .transition().duration(400).delay((_d, i) => 300 + i * 8)
+        .attr("opacity", 1);
+    }
 
     // ── Spine node circles (with staggered animation) ──
     const spineCircles = g.append("g")
@@ -604,11 +619,15 @@ export default function SpineMap() {
         }
       });
 
-    // Staggered fade-in from bottom to top
-    spineCircles.transition()
-      .duration(500)
-      .delay((_d, i) => i * 40)
-      .attr("r", (d) => d.radius);
+    // Staggered fade-in from bottom to top (skip on zoom restore)
+    if (isRestoringZoom) {
+      spineCircles.attr("r", (d) => d.radius);
+    } else {
+      spineCircles.transition()
+        .duration(500)
+        .delay((_d, i) => i * 40)
+        .attr("r", (d) => d.radius);
+    }
 
 
     // ── Node count badges ──
@@ -640,7 +659,11 @@ export default function SpineMap() {
       .attr("font-weight", 700)
       .attr("fill", "white");
 
-    badgeG.transition().duration(400).delay((_d, i) => 600 + i * 40).attr("opacity", 1);
+    if (isRestoringZoom) {
+      badgeG.attr("opacity", 1);
+    } else {
+      badgeG.transition().duration(400).delay((_d, i) => 600 + i * 40).attr("opacity", 1);
+    }
 
   }, [nodes, navigate, showPrintView, collapsedTiers, matchingIds, toggleTier, branchCountBySpine, ancestorPathIds, selectedNodeId]);
 
