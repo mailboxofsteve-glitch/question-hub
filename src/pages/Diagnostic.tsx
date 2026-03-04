@@ -6,7 +6,6 @@ import * as d3 from "d3";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import NodeDetailContent from "@/components/NodeDetailContent";
 import { useDiagnosticProgress, type DiagnosticResponse } from "@/hooks/use-diagnostic-progress";
 import { useAuth } from "@/hooks/use-auth";
@@ -57,6 +56,7 @@ export default function Diagnostic() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [overlayNodeId, setOverlayNodeId] = useState<string | null>(null);
+  const [diagnosticReady, setDiagnosticReady] = useState(false);
 
   const { user } = useAuth();
 
@@ -464,32 +464,31 @@ export default function Diagnostic() {
       </div>
 
       {/* Diagnostic overlay with response buttons */}
-      <Dialog open={!!overlayNodeId} onOpenChange={(open) => { if (!open) setOverlayNodeId(null); }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] p-0 gap-0 overflow-visible border-none bg-transparent shadow-none [&>button]:hidden">
+      <Dialog open={!!overlayNodeId} onOpenChange={(open) => { if (!open) { setOverlayNodeId(null); setDiagnosticReady(false); } }}>
+        <DialogContent className="max-w-2xl p-0 gap-0 overflow-visible border-none bg-transparent shadow-none [&>button]:hidden my-24">
           <DialogTitle className="sr-only">Node Detail</DialogTitle>
           <div className="relative">
             {/* Main content card */}
             <div className="bg-background border border-border rounded-lg shadow-lg overflow-hidden">
-              <ScrollArea className="max-h-[85vh]">
-                <div className="p-6">
-                  {overlayNodeId && (
-                    <NodeDetailContent
-                      id={overlayNodeId}
-                      onNavigateNode={(nodeId) => {
-                        if (unlockedIds.has(nodeId.toLowerCase())) setOverlayNodeId(nodeId);
-                      }}
-                      diagnosticMode
-                      onDiagnosticReady={(ready) => {
-                        // This callback is handled by the component internally
-                      }}
-                    />
-                  )}
-                </div>
-              </ScrollArea>
+              <div className="overflow-y-auto max-h-[60vh] p-6">
+                {overlayNodeId && (
+                  <NodeDetailContent
+                    id={overlayNodeId}
+                    onNavigateNode={(nodeId) => {
+                      if (unlockedIds.has(nodeId.toLowerCase())) {
+                        setOverlayNodeId(nodeId);
+                        setDiagnosticReady(false);
+                      }
+                    }}
+                    diagnosticMode
+                    onDiagnosticReady={setDiagnosticReady}
+                  />
+                )}
+              </div>
 
               {/* Close button */}
               <button
-                onClick={() => setOverlayNodeId(null)}
+                onClick={() => { setOverlayNodeId(null); setDiagnosticReady(false); }}
                 className="absolute top-3 right-3 z-10 rounded-sm p-1 opacity-70 hover:opacity-100 transition-opacity bg-background border border-border shadow-sm"
                 aria-label="Close"
               >
@@ -497,8 +496,8 @@ export default function Diagnostic() {
               </button>
             </div>
 
-            {/* Response buttons positioned outside the modal */}
-            {overlayNodeId && !respondedIds.has(overlayNodeId.toLowerCase()) && (
+            {/* Response buttons — show if user hasn't agreed yet */}
+            {overlayNodeId && responseMap.get(overlayNodeId.toLowerCase()) !== 'agree' && (
               <>
                 {/* Agree — right side */}
                 <button
@@ -515,7 +514,7 @@ export default function Diagnostic() {
                 {/* Disagree — left side */}
                 <button
                   onClick={() => handleResponse('disagree')}
-                  disabled={false}
+                  disabled={!diagnosticReady}
                   className="absolute top-1/2 -translate-y-1/2 -left-16 md:-left-20 flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Disagree"
                 >
@@ -528,7 +527,7 @@ export default function Diagnostic() {
                 {/* I Don't Know — bottom */}
                 <button
                   onClick={() => handleResponse('dont_know')}
-                  disabled={false}
+                  disabled={!diagnosticReady}
                   className="absolute -bottom-16 md:-bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="I Don't Know"
                 >

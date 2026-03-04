@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, BookOpen, Lightbulb, ExternalLink, Share2 } from 'lucide-react';
 import MarkdownText from '@/components/MarkdownText';
@@ -73,6 +73,12 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
   const { toast } = useToast();
   const { addItem } = useRecentlyViewed();
 
+  // Diagnostic engagement tracking
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+  const [openedAccordionIds, setOpenedAccordionIds] = useState<Set<string>>(new Set());
+  const [reasoningOpened, setReasoningOpened] = useState(false);
+  const contentEndRef = useRef<HTMLDivElement>(null);
+
   const { data: node, isLoading, error } = useQuery({
     queryKey: ['node-detail', id],
     queryFn: async () => {
@@ -111,7 +117,46 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
   const resources = layer3.resources ?? [];
   const sources = layer3.sources ?? [];
 
-  // Track view + save to recently viewed
+  // Diagnostic engagement: track scroll + accordion expansion
+  const totalReasoningIds = useMemo(
+    () => reasoning.map((b, i) => b.id ?? `r-${i}`),
+    [reasoning],
+  );
+
+  const allAccordionsOpened = useMemo(() => {
+    if (totalReasoningIds.length === 0) return true; // no reasoning = no requirement
+    return totalReasoningIds.every((rid) => openedAccordionIds.has(rid));
+  }, [totalReasoningIds, openedAccordionIds]);
+
+  const noReasoningSection = reasoning.length === 0;
+  const diagnosticReady = hasScrolledToBottom && (noReasoningSection || (reasoningOpened && allAccordionsOpened));
+
+  // Report readiness to parent
+  useEffect(() => {
+    if (diagnosticMode && onDiagnosticReady) {
+      onDiagnosticReady(diagnosticReady);
+    }
+  }, [diagnosticMode, diagnosticReady, onDiagnosticReady]);
+
+  // Reset engagement state when node changes
+  useEffect(() => {
+    setHasScrolledToBottom(false);
+    setOpenedAccordionIds(new Set());
+    setReasoningOpened(false);
+  }, [id]);
+
+  // Intersection observer to detect scroll-to-bottom
+  useEffect(() => {
+    if (!diagnosticMode || !contentEndRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setHasScrolledToBottom(true); },
+      { threshold: 0.5 },
+    );
+    observer.observe(contentEndRef.current);
+    return () => observer.disconnect();
+  }, [diagnosticMode, node?.id]);
+
+
   const trackedRef = useRef<string | null>(null);
   useEffect(() => {
     if (node?.id && trackedRef.current !== node.id) {
@@ -180,7 +225,7 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
       {/* ── Layer 2: Reasoning accordion ── */}
       {reasoning.length > 0 && (
         <section className="mb-8">
-          <Collapsible onOpenChange={(open) => { if (open) trackEvent('expand_reasoning', node.id); }}>
+          <Collapsible onOpenChange={(open) => { if (open) { trackEvent('expand_reasoning', node.id); setReasoningOpened(true); } }}>
             <CollapsibleTrigger className="flex items-center gap-2 w-full group cursor-pointer">
               <div className="w-8 h-8 rounded-md bg-amber-subtle flex items-center justify-center">
                 <BookOpen className="w-4 h-4 text-accent" />
@@ -193,7 +238,10 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
 
             <CollapsibleContent className="mt-4">
               <Accordion type="multiple" className="space-y-2" onValueChange={(values) => {
-                values.forEach(v => trackEvent('expand_reasoning_bullet', node.id, { bullet_id: v }));
+                values.forEach(v => {
+                  trackEvent('expand_reasoning_bullet', node.id, { bullet_id: v });
+                  setOpenedAccordionIds((prev) => new Set(prev).add(v));
+                });
               }}>
                 {reasoning.map((bullet, i) => (
                   <AccordionItem
@@ -326,6 +374,8 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
           </Collapsible>
         </section>
       )}
+      {/* Sentinel for scroll tracking */}
+      {diagnosticMode && <div ref={contentEndRef} className="h-1" />}
     </div>
   );
 };

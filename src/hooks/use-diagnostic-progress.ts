@@ -107,9 +107,15 @@ export function useDiagnosticProgress(allNodes: NodeRecord[] | undefined) {
     return map;
   }, [progress]);
 
+  // Only "agree" responses unlock the next nodes
+  const agreedIds = useMemo(
+    () => new Set(progress.filter((p) => p.response === 'agree').map((p) => p.node_id.toLowerCase())),
+    [progress],
+  );
+
   const unlockedIds = useMemo(
-    () => computeUnlocked(respondedIds, allNodes ?? []),
-    [respondedIds, allNodes],
+    () => computeUnlocked(agreedIds, allNodes ?? []),
+    [agreedIds, allNodes],
   );
 
   // Mutation for authenticated users
