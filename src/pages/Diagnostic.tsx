@@ -5,6 +5,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import * as d3 from "d3";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import NodeDetailContent from "@/components/NodeDetailContent";
 import { useDiagnosticProgress, type DiagnosticResponse } from "@/hooks/use-diagnostic-progress";
@@ -57,6 +58,8 @@ export default function Diagnostic() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [overlayNodeId, setOverlayNodeId] = useState<string | null>(null);
   const [diagnosticReady, setDiagnosticReady] = useState(false);
+  const [pendingResponse, setPendingResponse] = useState<'disagree' | 'dont_know' | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   const { user } = useAuth();
 
@@ -84,10 +87,12 @@ export default function Diagnostic() {
 
   const { respondedIds, responseMap, unlockedIds, respond } = useDiagnosticProgress(nodes);
 
-  const handleResponse = useCallback((response: DiagnosticResponse) => {
+  const handleResponse = useCallback((response: DiagnosticResponse, note?: string) => {
     if (!overlayNodeId) return;
-    respond(overlayNodeId, response);
+    respond(overlayNodeId, response, note);
     setOverlayNodeId(null);
+    setPendingResponse(null);
+    setNoteText("");
   }, [overlayNodeId, respond]);
 
   // Precompute groupings (same as SpineMap)
@@ -464,7 +469,7 @@ export default function Diagnostic() {
       </div>
 
       {/* Diagnostic overlay with response buttons */}
-      <Dialog open={!!overlayNodeId} onOpenChange={(open) => { if (!open) { setOverlayNodeId(null); setDiagnosticReady(false); } }}>
+      <Dialog open={!!overlayNodeId} onOpenChange={(open) => { if (!open) { setOverlayNodeId(null); setDiagnosticReady(false); setPendingResponse(null); setNoteText(""); } }}>
         <DialogContent className="max-w-2xl p-0 gap-0 border-none bg-transparent shadow-none [&>button]:hidden">
           <DialogTitle className="sr-only">Node Detail</DialogTitle>
           <div className="relative">
@@ -496,43 +501,73 @@ export default function Diagnostic() {
               </button>
             </div>
 
-            {/* Response buttons below modal */}
+            {/* Response buttons or note field below modal */}
             {overlayNodeId && responseMap.get(overlayNodeId.toLowerCase()) !== 'agree' && (
-              <div className="flex justify-center items-start gap-4 mt-4 pb-4">
-                <button
-                  onClick={() => handleResponse('disagree')}
-                  disabled={!diagnosticReady}
-                  className="flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
-                  aria-label="Disagree"
-                >
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.disagree }}>
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5l-10 10" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
+              <div className="mt-4 pb-4">
+                {pendingResponse ? (
+                  <div className="bg-background border border-border rounded-lg p-4 space-y-3">
+                    <Textarea
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      placeholder={pendingResponse === 'disagree' ? "Explain why you disagree..." : "What are you struggling with?"}
+                      className="min-h-[80px] resize-none"
+                      autoFocus
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => { setPendingResponse(null); setNoteText(""); }}
+                        className="px-4 py-2 text-sm font-medium rounded-md border border-border bg-background hover:bg-accent transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleResponse(pendingResponse, noteText)}
+                        disabled={!noteText.trim()}
+                        className="px-4 py-2 text-sm font-medium rounded-md text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        style={{ backgroundColor: pendingResponse === 'disagree' ? RESPONSE_COLORS.disagree : RESPONSE_COLORS.dont_know }}
+                      >
+                        Submit
+                      </button>
+                    </div>
                   </div>
-                  <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.disagree }}>Disagree</span>
-                </button>
+                ) : (
+                  <div className="flex justify-center items-start gap-4">
+                    <button
+                      onClick={() => setPendingResponse('disagree')}
+                      disabled={!diagnosticReady}
+                      className="flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
+                      aria-label="Disagree"
+                    >
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.disagree }}>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5l-10 10" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
+                      </div>
+                      <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.disagree }}>Disagree</span>
+                    </button>
 
-                <button
-                  onClick={() => handleResponse('dont_know')}
-                  disabled={!diagnosticReady}
-                  className="flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
-                  aria-label="I Don't Know"
-                >
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.dont_know }}>
-                    <span className="text-white font-bold text-lg">?</span>
-                  </div>
-                  <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.dont_know }}>Don't Know</span>
-                </button>
+                    <button
+                      onClick={() => setPendingResponse('dont_know')}
+                      disabled={!diagnosticReady}
+                      className="flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
+                      aria-label="I Don't Know"
+                    >
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.dont_know }}>
+                        <span className="text-white font-bold text-lg">?</span>
+                      </div>
+                      <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.dont_know }}>Don't Know</span>
+                    </button>
 
-                <button
-                  onClick={() => handleResponse('agree')}
-                  className="flex flex-col items-center gap-1 group"
-                  aria-label="Agree"
-                >
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.agree }}>
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <button
+                      onClick={() => handleResponse('agree')}
+                      className="flex flex-col items-center gap-1 group"
+                      aria-label="Agree"
+                    >
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.agree }}>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </div>
+                      <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.agree }}>Agree</span>
+                    </button>
                   </div>
-                  <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.agree }}>Agree</span>
-                </button>
+                )}
               </div>
             )}
           </div>
