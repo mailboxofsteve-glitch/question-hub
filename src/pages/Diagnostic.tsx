@@ -63,7 +63,6 @@ export default function Diagnostic() {
   const [noteText, setNoteText] = useState("");
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('diagnostic-welcome-seen'));
   const [showRouteChoice, setShowRouteChoice] = useState(false);
-  const [justResponded, setJustResponded] = useState(false);
 
   const dismissWelcome = useCallback(() => {
     localStorage.setItem('diagnostic-welcome-seen', '1');
@@ -125,29 +124,21 @@ export default function Diagnostic() {
   const handleResponse = useCallback((response: DiagnosticResponse, note?: string) => {
     if (!overlayNodeId) return;
     respond(overlayNodeId, response, note);
-    setOverlayNodeId(null);
     setPendingResponse(null);
     setNoteText("");
     setDiagnosticReady(false);
-    setJustResponded(true);
-  }, [overlayNodeId, respond]);
 
-  // Auto-advance after response: wait for state to settle then open next
-  useEffect(() => {
-    if (!justResponded) return;
-    setJustResponded(false);
-    // Use a small timeout to let respondedIds/unlockedIds recompute
-    const timer = setTimeout(() => {
-      if (availableNodes.length === 1) {
-        setOverlayNodeId(availableNodes[0].id);
-        setDiagnosticReady(false);
-      } else if (availableNodes.length > 1) {
-        setShowRouteChoice(true);
-      }
-      // if 0, journey complete or blocked — do nothing
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [justResponded, availableNodes]);
+    // Compute next available nodes excluding the one just responded to
+    const nextAvailable = availableNodes.filter(n => n.id !== overlayNodeId);
+    if (nextAvailable.length === 1) {
+      setOverlayNodeId(nextAvailable[0].id);
+    } else if (nextAvailable.length > 1) {
+      setOverlayNodeId(null);
+      setShowRouteChoice(true);
+    } else {
+      setOverlayNodeId(null);
+    }
+  }, [overlayNodeId, respond, availableNodes]);
 
   // Precompute groupings (same as SpineMap)
   const { branchCountBySpine } = useMemo(() => {
