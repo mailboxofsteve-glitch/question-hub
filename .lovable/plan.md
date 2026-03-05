@@ -1,28 +1,20 @@
 
 
-## Add Note Field for Disagree / Don't Know Responses
+## Add Welcome Instructions Dialog to Diagnostic Journey
 
-When a user clicks "Disagree" or "Don't Know", instead of immediately submitting, show a note input area below the buttons with Submit and Cancel options.
+When the Diagnostic page loads, show a dismissible dialog explaining how the journey works. Use `localStorage` to track whether the user has seen it, so it only auto-opens on first visit (with an option to reopen it later).
 
-### Flow
+### Dialog Content (plain language)
+1. Some early questions may seem obvious or irrelevant — they lay the foundation for deeper questions ahead.
+2. To disagree or say "I don't know", you must first expand and read all the content within the question node.
+3. If you disagree or don't know, you'll be asked to briefly explain why before submitting.
+4. You can only progress to the next question once you agree with the relevant prerequisite questions.
 
-1. User clicks Disagree or Don't Know → store the pending response type in state, show the note field
-2. Note field appears with placeholder text contextual to the response ("Explain why you disagree..." or "What are you struggling with?")
-3. **Submit** button — enabled only when the text field is non-empty — calls `respond(nodeId, response, note)` and closes the overlay
-4. **Cancel** button — always available — hides the note field and returns to the three-button state
+### Implementation
 
-### Changes — `src/pages/Diagnostic.tsx`
-
-- Add state: `pendingResponse: 'disagree' | 'dont_know' | null` and `noteText: string`
-- When Disagree/Don't Know is clicked, set `pendingResponse` instead of calling `handleResponse`
-- Conditionally render: if `pendingResponse` is set, replace the button row with a note input area (Textarea + Submit/Cancel buttons)
-- Submit calls `respond(overlayNodeId, pendingResponse, noteText)` and closes overlay
-- Cancel resets `pendingResponse` and `noteText` back to null/empty
-- Reset `pendingResponse`/`noteText` when overlay closes or node changes
-- Update `handleResponse` to accept optional note parameter
-
-### Files Modified
-| File | Change |
-|------|--------|
-| `src/pages/Diagnostic.tsx` | Add pending response state, note textarea, Submit/Cancel flow |
+**`src/pages/Diagnostic.tsx`**
+- Add state `showWelcome` initialized to `!localStorage.getItem('diagnostic-welcome-seen')`
+- On close, set localStorage flag and `setShowWelcome(false)`
+- Render a `Dialog` with `open={showWelcome}` containing the instructions text and a "Got it" button
+- Add a small help/info button (e.g. `HelpCircle` icon) in the page header area that reopens the dialog on click
 
