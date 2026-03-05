@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/layout/AppLayout";
 import * as d3 from "d3";
-import { Search, HelpCircle } from "lucide-react";
+import { Search, HelpCircle, Play, RotateCcw, CheckCircle2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,8 @@ export default function Diagnostic() {
   const [pendingResponse, setPendingResponse] = useState<'disagree' | 'dont_know' | null>(null);
   const [noteText, setNoteText] = useState("");
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('diagnostic-welcome-seen'));
+  const [showRouteChoice, setShowRouteChoice] = useState(false);
+  const [justResponded, setJustResponded] = useState(false);
 
   const dismissWelcome = useCallback(() => {
     localStorage.setItem('diagnostic-welcome-seen', '1');
@@ -94,13 +96,58 @@ export default function Diagnostic() {
 
   const { respondedIds, responseMap, unlockedIds, respond } = useDiagnosticProgress(nodes);
 
+  // Compute available (unlocked & unresponded) nodes, sorted spine-first
+  const availableNodes = useMemo(() => {
+    if (!nodes) return [];
+    const spinePattern = /^s-(\d+)$/i;
+    return nodes
+      .filter((n) => unlockedIds.has(n.id.toLowerCase()) && !respondedIds.has(n.id.toLowerCase()))
+      .sort((a, b) => {
+        const aSpine = spinePattern.test(a.id);
+        const bSpine = spinePattern.test(b.id);
+        if (aSpine && !bSpine) return -1;
+        if (!aSpine && bSpine) return 1;
+        return a.id.localeCompare(b.id);
+      });
+  }, [nodes, unlockedIds, respondedIds]);
+
+  const journeyComplete = availableNodes.length === 0 && respondedIds.size > 0;
+
+  const openNextNode = useCallback(() => {
+    if (availableNodes.length === 1) {
+      setOverlayNodeId(availableNodes[0].id);
+      setDiagnosticReady(false);
+    } else if (availableNodes.length > 1) {
+      setShowRouteChoice(true);
+    }
+  }, [availableNodes]);
+
   const handleResponse = useCallback((response: DiagnosticResponse, note?: string) => {
     if (!overlayNodeId) return;
     respond(overlayNodeId, response, note);
     setOverlayNodeId(null);
     setPendingResponse(null);
     setNoteText("");
+    setDiagnosticReady(false);
+    setJustResponded(true);
   }, [overlayNodeId, respond]);
+
+  // Auto-advance after response: wait for state to settle then open next
+  useEffect(() => {
+    if (!justResponded) return;
+    setJustResponded(false);
+    // Use a small timeout to let respondedIds/unlockedIds recompute
+    const timer = setTimeout(() => {
+      if (availableNodes.length === 1) {
+        setOverlayNodeId(availableNodes[0].id);
+        setDiagnosticReady(false);
+      } else if (availableNodes.length > 1) {
+        setShowRouteChoice(true);
+      }
+      // if 0, journey complete or blocked — do nothing
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [justResponded, availableNodes]);
 
   // Precompute groupings (same as SpineMap)
   const { branchCountBySpine } = useMemo(() => {
@@ -474,6 +521,25 @@ export default function Diagnostic() {
                 {tooltip.text}
               </div>
             )}
+            {/* Start / Resume / Complete overlay button */}
+            {!overlayNodeId && !showWelcome && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                <Button
+                  size="lg"
+                  className="pointer-events-auto text-base px-8 py-6 shadow-xl gap-2"
+                  disabled={journeyComplete}
+                  onClick={openNextNode}
+                >
+                  {respondedIds.size === 0 ? (
+                    <><Play className="w-5 h-5" /> Start Diagnostic</>
+                  ) : journeyComplete ? (
+                    <><CheckCircle2 className="w-5 h-5" /> Journey Complete</>
+                  ) : (
+                    <><RotateCcw className="w-5 h-5" /> Resume Diagnostic</>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -580,6 +646,35 @@ export default function Diagnostic() {
                 )}
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Route choice dialog */}
+      <Dialog open={showRouteChoice} onOpenChange={setShowRouteChoice}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose Your Next Question</DialogTitle>
+            <DialogDescription>Multiple questions are available. Select which one to explore next.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+            {availableNodes.map((node) => (
+              <button
+                key={node.id}
+                onClick={() => {
+                  setShowRouteChoice(false);
+                  setOverlayNodeId(node.id);
+                  setDiagnosticReady(false);
+                }}
+                className="w-full text-left px-4 py-3 rounded-lg border border-border hover:bg-accent transition-colors flex items-center gap-3"
+              >
+                <span className="inline-block w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: TIER_COLORS[node.tier ?? 0] }} />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm text-foreground truncate">{node.title}</p>
+                  <p className="text-xs text-muted-foreground">{node.id.toUpperCase()}</p>
+                </div>
+              </button>
+            ))}
           </div>
         </DialogContent>
       </Dialog>
