@@ -465,7 +465,7 @@ export default function Diagnostic() {
 
       {/* Diagnostic overlay with response buttons */}
       <Dialog open={!!overlayNodeId} onOpenChange={(open) => { if (!open) { setOverlayNodeId(null); setDiagnosticReady(false); } }}>
-        <DialogContent className="max-w-2xl p-0 gap-0 overflow-visible border-none bg-transparent shadow-none [&>button]:hidden my-24">
+        <DialogContent className="max-w-2xl p-0 gap-0 border-none bg-transparent shadow-none [&>button]:hidden">
           <DialogTitle className="sr-only">Node Detail</DialogTitle>
           <div className="relative">
             {/* Main content card */}
@@ -496,47 +496,44 @@ export default function Diagnostic() {
               </button>
             </div>
 
-            {/* Response buttons — show if user hasn't agreed yet */}
+            {/* Response buttons below modal */}
             {overlayNodeId && responseMap.get(overlayNodeId.toLowerCase()) !== 'agree' && (
-              <>
-                {/* Agree — right side */}
-                <button
-                  onClick={() => handleResponse('agree')}
-                  className="absolute top-1/2 -translate-y-1/2 -right-16 md:-right-20 flex flex-col items-center gap-1 group"
-                  aria-label="Agree"
-                >
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.agree }}>
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </div>
-                  <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.agree }}>Agree</span>
-                </button>
-
-                {/* Disagree — left side */}
+              <div className="flex justify-center items-start gap-4 mt-4 pb-4">
                 <button
                   onClick={() => handleResponse('disagree')}
                   disabled={!diagnosticReady}
-                  className="absolute top-1/2 -translate-y-1/2 -left-16 md:-left-20 flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Disagree"
                 >
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110 group-disabled:group-hover:scale-100" style={{ backgroundColor: RESPONSE_COLORS.disagree }}>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.disagree }}>
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5l-10 10" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
                   </div>
                   <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.disagree }}>Disagree</span>
                 </button>
 
-                {/* I Don't Know — bottom */}
                 <button
                   onClick={() => handleResponse('dont_know')}
                   disabled={!diagnosticReady}
-                  className="absolute -bottom-16 md:-bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="I Don't Know"
                 >
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110 group-disabled:group-hover:scale-100" style={{ backgroundColor: RESPONSE_COLORS.dont_know }}>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.dont_know }}>
                     <span className="text-white font-bold text-lg">?</span>
                   </div>
                   <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.dont_know }}>Don't Know</span>
                 </button>
-              </>
+
+                <button
+                  onClick={() => handleResponse('agree')}
+                  className="flex flex-col items-center gap-1 group"
+                  aria-label="Agree"
+                >
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.agree }}>
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.agree }}>Agree</span>
+                </button>
+              </div>
             )}
           </div>
         </DialogContent>
