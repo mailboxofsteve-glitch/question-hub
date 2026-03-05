@@ -3,10 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/layout/AppLayout";
 import * as d3 from "d3";
-import { Search } from "lucide-react";
+import { Search, HelpCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import NodeDetailContent from "@/components/NodeDetailContent";
 import { useDiagnosticProgress, type DiagnosticResponse } from "@/hooks/use-diagnostic-progress";
 import { useAuth } from "@/hooks/use-auth";
@@ -60,6 +61,12 @@ export default function Diagnostic() {
   const [diagnosticReady, setDiagnosticReady] = useState(false);
   const [pendingResponse, setPendingResponse] = useState<'disagree' | 'dont_know' | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('diagnostic-welcome-seen'));
+
+  const dismissWelcome = useCallback(() => {
+    localStorage.setItem('diagnostic-welcome-seen', '1');
+    setShowWelcome(false);
+  }, []);
 
   const { user } = useAuth();
 
@@ -419,6 +426,9 @@ export default function Diagnostic() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <Input placeholder="Search nodes…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-8 pl-8 text-sm" />
             </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowWelcome(true)} title="How it works">
+              <HelpCircle className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
@@ -571,6 +581,33 @@ export default function Diagnostic() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Welcome instructions dialog */}
+      <Dialog open={showWelcome} onOpenChange={(open) => { if (!open) dismissWelcome(); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Welcome to the Diagnostic Journey</DialogTitle>
+            <DialogDescription>Here's how to navigate and respond to each question.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm leading-relaxed text-foreground">
+            <div className="space-y-1">
+              <p className="font-medium">Why do some questions seem obvious?</p>
+              <p className="text-muted-foreground">The early questions lay a necessary foundation. Even if they feel elementary, they are prerequisites that unlock deeper, more complex questions ahead.</p>
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium">How to respond</p>
+              <p className="text-muted-foreground">Open a question node and read through all of its content. If you wish to <strong>Disagree</strong> or say <strong>I Don't Know</strong>, you must first expand and review the full reasoning before those options become available. You'll then be asked to briefly explain your position before submitting.</p>
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium">Progressing through the journey</p>
+              <p className="text-muted-foreground">You can only advance to the next question once you <strong>Agree</strong> with the relevant prerequisite questions. Disagreeing or saying you don't know will not unlock further nodes — but you can always revisit a question and change your response.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={dismissWelcome}>Got it</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AppLayout>
