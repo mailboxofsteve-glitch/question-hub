@@ -1,49 +1,26 @@
 
 
-## Guided Diagnostic Flow: Start/Resume + Auto-Advance
+## Fix Auto-Advance: Keep Overlay Open Between Nodes
 
-### Overview
-Transform the diagnostic journey from manual node-clicking into a guided flow: a prominent button over the graph auto-opens the next unresponded node, and after each submission the next node opens automatically. When multiple nodes are available, the user picks which route to take.
+The current issue is that `handleResponse` clears `overlayNodeId` to `null` (closing the modal), then a `useEffect` with a 100ms timeout tries to reopen the next node. This causes a visible flash back to the graph with the Resume button.
 
-### Key Concepts
+### Root Cause
+The timeout-based approach is unreliable — `availableNodes` may not have recomputed yet since the DB query invalidation is async (for authenticated users).
 
-**Next available nodes**: unlocked nodes that have NOT been responded to. Computed from `unlockedIds` minus `respondedIds`.
+### Fix
 
-**Ordering**: Spine nodes first (by number), then branch nodes. This gives a natural progression.
+**In `handleResponse`**: Instead of clearing `overlayNodeId` to `null`, compute the next available nodes inline by filtering `availableNodes` to exclude the node just responded to. Then:
+- If 1 next node: set `overlayNodeId` directly to it (no flash)
+- If >1 next nodes: clear overlay, show route choice dialog
+- If 0 next nodes: clear overlay (journey complete)
 
-**Route choice**: When >1 node is available, show a selection dialog listing the options with their titles before opening one.
+**Remove the `justResponded` state and its `useEffect`** — no longer needed since we handle advancement synchronously.
 
 ### Changes — `src/pages/Diagnostic.tsx`
 
-1. **Compute `availableNodes`** (memo): filter `nodes` to those in `unlockedIds` but not in `respondedIds`, sorted spine-first then by ID.
-
-2. **`journeyComplete`** flag: `availableNodes.length === 0 && respondedIds.size > 0`.
-
-3. **Start/Resume button**: Render a centered overlay button on top of the graph container:
-   - Label: `respondedIds.size === 0 ? "Start Diagnostic" : journeyComplete ? "Journey Complete" : "Resume Diagnostic"`
-   - On click: if 1 available node → open it directly; if >1 → set `showRouteChoice = true`; if 0 → no-op (disabled).
-
-4. **Route choice dialog**: A new `Dialog` listing available nodes as clickable options (title + ID). Selecting one sets `overlayNodeId` and closes the dialog.
-
-5. **Auto-advance after submit**: In `handleResponse`, after calling `respond()`, instead of just closing the overlay, compute the next available nodes (post-response). If 1 → open it; if >1 → show route choice; if 0 → close overlay (journey complete or blocked).
-   - Since state updates are async, use a `useEffect` that watches for when `overlayNodeId` is cleared after a response to trigger auto-advance.
-
-6. **State additions**:
-   - `showRouteChoice: boolean` — controls the route selection dialog
-   - `justResponded: boolean` — flag to trigger auto-advance after response submission
-
-### Flow Diagram
-```text
-Welcome Dialog → [Dismiss] → Graph + "Start Diagnostic" button
-  → [Click] → (1 node available) → Open node modal
-            → (>1 nodes available) → Route choice dialog → select → Open node modal
-  → [Respond] → (next nodes available) → auto-open or route choice
-             → (no next nodes) → back to graph + "Resume" or "Complete"
-  → [Close modal] → Graph + "Resume Diagnostic" button
-```
-
-### Files Modified
-| File | Change |
+| What | Detail |
 |------|--------|
-| `src/pages/Diagnostic.tsx` | Add availableNodes memo, Start/Resume button, route choice dialog, auto-advance logic |
+| `handleResponse` | Compute `nextAvailable = availableNodes.filter(n => n.id !== overlayNodeId)`. Branch on length: set next overlay directly, show route choice, or close. |
+| Remove `justResponded` state | No longer needed |
+| Remove auto-advance `useEffect` | Lines 136-150 deleted |
 
