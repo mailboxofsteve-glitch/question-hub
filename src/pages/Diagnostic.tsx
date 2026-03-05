@@ -95,6 +95,8 @@ export default function Diagnostic() {
 
   const { respondedIds, responseMap, unlockedIds, respond } = useDiagnosticProgress(nodes);
 
+  const pendingAdvanceRef = useRef(false);
+
   // Compute available (unlocked & unresponded) nodes, sorted spine-first
   const availableNodes = useMemo(() => {
     if (!nodes) return [];
@@ -121,24 +123,28 @@ export default function Diagnostic() {
     }
   }, [availableNodes]);
 
+  // Auto-advance after response: reacts to updated availableNodes
+  useEffect(() => {
+    if (!pendingAdvanceRef.current) return;
+    pendingAdvanceRef.current = false;
+    if (availableNodes.length === 1) {
+      setOverlayNodeId(availableNodes[0].id);
+      setDiagnosticReady(false);
+    } else if (availableNodes.length > 1) {
+      setShowRouteChoice(true);
+    }
+    // if 0, journey complete — do nothing
+  }, [availableNodes]);
+
   const handleResponse = useCallback((response: DiagnosticResponse, note?: string) => {
     if (!overlayNodeId) return;
     respond(overlayNodeId, response, note);
     setPendingResponse(null);
     setNoteText("");
     setDiagnosticReady(false);
-
-    // Compute next available nodes excluding the one just responded to
-    const nextAvailable = availableNodes.filter(n => n.id !== overlayNodeId);
-    if (nextAvailable.length === 1) {
-      setOverlayNodeId(nextAvailable[0].id);
-    } else if (nextAvailable.length > 1) {
-      setOverlayNodeId(null);
-      setShowRouteChoice(true);
-    } else {
-      setOverlayNodeId(null);
-    }
-  }, [overlayNodeId, respond, availableNodes]);
+    setOverlayNodeId(null);
+    pendingAdvanceRef.current = true;
+  }, [overlayNodeId, respond]);
 
   // Precompute groupings (same as SpineMap)
   const { branchCountBySpine } = useMemo(() => {
