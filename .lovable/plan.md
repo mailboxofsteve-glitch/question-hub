@@ -1,34 +1,28 @@
 
 
-## Fix: Move Response Buttons Below Modal on Mobile
+## Add Note Field for Disagree / Don't Know Responses
 
-The three response buttons (Agree, Disagree, Don't Know) are currently absolutely positioned outside the modal borders (left, right, bottom). On mobile, the side buttons get clipped off-screen since there's no room.
+When a user clicks "Disagree" or "Don't Know", instead of immediately submitting, show a note input area below the buttons with Submit and Cancel options.
 
-### Solution
-Replace the absolute-positioned layout with a **row of buttons below the modal card**, inside the same relative container. This works on all screen sizes and is simpler.
+### Flow
 
-### Changes — `src/pages/Diagnostic.tsx` (lines 499-539)
+1. User clicks Disagree or Don't Know → store the pending response type in state, show the note field
+2. Note field appears with placeholder text contextual to the response ("Explain why you disagree..." or "What are you struggling with?")
+3. **Submit** button — enabled only when the text field is non-empty — calls `respond(nodeId, response, note)` and closes the overlay
+4. **Cancel** button — always available — hides the note field and returns to the three-button state
 
-Replace the three absolutely-positioned buttons with a horizontal flex row placed after the modal card (inside the relative wrapper, but after the card div closes):
+### Changes — `src/pages/Diagnostic.tsx`
 
-```text
-┌─────────────────────┐
-│   Node Detail Modal  │
-│                      │
-└─────────────────────┘
- [Disagree] [Don't Know] [Agree]
-```
-
-- Use `flex justify-center gap-4 mt-4 pb-4` for the button row
-- Keep the same circular button styling and colors
-- Keep the disabled logic (`!diagnosticReady` for Disagree/Don't Know)
-- Remove all absolute positioning, negative offsets, and `overflow-visible` hacks
-- Adjust `DialogContent` — remove `my-24` (no longer needed for side buttons), use standard padding
-
-This single layout works on both mobile and desktop without breakpoint-specific positioning.
+- Add state: `pendingResponse: 'disagree' | 'dont_know' | null` and `noteText: string`
+- When Disagree/Don't Know is clicked, set `pendingResponse` instead of calling `handleResponse`
+- Conditionally render: if `pendingResponse` is set, replace the button row with a note input area (Textarea + Submit/Cancel buttons)
+- Submit calls `respond(overlayNodeId, pendingResponse, noteText)` and closes overlay
+- Cancel resets `pendingResponse` and `noteText` back to null/empty
+- Reset `pendingResponse`/`noteText` when overlay closes or node changes
+- Update `handleResponse` to accept optional note parameter
 
 ### Files Modified
 | File | Change |
 |------|--------|
-| `src/pages/Diagnostic.tsx` | Replace absolute-positioned buttons with a flex row below the modal card |
+| `src/pages/Diagnostic.tsx` | Add pending response state, note textarea, Submit/Cancel flow |
 
