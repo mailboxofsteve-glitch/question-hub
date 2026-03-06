@@ -3,14 +3,18 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/layout/AppLayout";
 import * as d3 from "d3";
-import { Search, HelpCircle, Play, RotateCcw, CheckCircle2 } from "lucide-react";
+import { Search, HelpCircle, Play, RotateCcw, CheckCircle2, Lock, ChevronDown, Edit3 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import NodeDetailContent from "@/components/NodeDetailContent";
 import { useDiagnosticProgress, type DiagnosticResponse } from "@/hooks/use-diagnostic-progress";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 
 interface NodeRecord {
@@ -41,6 +45,12 @@ const RESPONSE_COLORS: Record<DiagnosticResponse, string> = {
   dont_know: "hsl(45, 93%, 47%)",
 };
 
+const RESPONSE_LABELS: Record<DiagnosticResponse, string> = {
+  agree: "Agree ✓",
+  disagree: "Disagree ✗",
+  dont_know: "I Don't Know ?",
+};
+
 const BAND_HEIGHT_MIN = 180;
 const BAND_HEIGHT_COLLAPSED = 44;
 const NODE_VERTICAL_SPACING = 70;
@@ -52,6 +62,7 @@ const TIER_COUNT = 7;
 export default function Diagnostic() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const startButtonRef = useRef<HTMLButtonElement>(null);
   const zoomTransformRef = useRef(d3.zoomIdentity);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const [collapsedTiers, setCollapsedTiers] = useState<Set<number>>(new Set());
@@ -63,6 +74,14 @@ export default function Diagnostic() {
   const [noteText, setNoteText] = useState("");
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('diagnostic-welcome-seen'));
   const [showRouteChoice, setShowRouteChoice] = useState(false);
+  // Feature 2 & 7: Smooth transitions + next-up banner
+  const [transitioning, setTransitioning] = useState(false);
+  const [nextUpTitle, setNextUpTitle] = useState<string | null>(null);
+  // Feature 6: Response editing
+  const [editingResponse, setEditingResponse] = useState(false);
+
+  const isMobile = useIsMobile();
+  const { toast } = useToast();
 
   const dismissWelcome = useCallback(() => {
     localStorage.setItem('diagnostic-welcome-seen', '1');
@@ -114,23 +133,44 @@ export default function Diagnostic() {
 
   const journeyComplete = availableNodes.length === 0 && respondedIds.size > 0;
 
+  // Feature 1: Progress indicator
+  const totalNodes = nodes?.length ?? 0;
+  const answeredCount = respondedIds.size;
+  const progressPercent = totalNodes > 0 ? Math.round((answeredCount / totalNodes) * 100) : 0;
+
   const openNextNode = useCallback(() => {
     if (availableNodes.length === 1) {
       setOverlayNodeId(availableNodes[0].id);
       setDiagnosticReady(false);
+      setEditingResponse(false);
     } else if (availableNodes.length > 1) {
       setShowRouteChoice(true);
     }
   }, [availableNodes]);
 
   // Auto-advance after response: reacts to updated availableNodes
+  // Feature 2 & 7: with fade transition and next-up banner
   useEffect(() => {
     if (!pendingAdvanceRef.current) return;
     pendingAdvanceRef.current = false;
+
+    const advanceTo = (nodeId: string, title: string) => {
+      setTransitioning(true);
+      setNextUpTitle(title);
+      setTimeout(() => {
+        setOverlayNodeId(nodeId);
+        setDiagnosticReady(false);
+        setEditingResponse(false);
+        setTransitioning(false);
+        // Auto-dismiss next-up banner after 2s
+        setTimeout(() => setNextUpTitle(null), 2000);
+      }, 300);
+    };
+
     if (availableNodes.length === 1) {
-      setOverlayNodeId(availableNodes[0].id);
-      setDiagnosticReady(false);
+      advanceTo(availableNodes[0].id, availableNodes[0].title);
     } else if (availableNodes.length > 1) {
+      setOverlayNodeId(null);
       setShowRouteChoice(true);
     }
     // if 0, journey complete — do nothing
@@ -142,9 +182,23 @@ export default function Diagnostic() {
     setPendingResponse(null);
     setNoteText("");
     setDiagnosticReady(false);
+    setEditingResponse(false);
+    // Feature 5: Toast feedback
+    toast({ title: "Response saved", description: response === 'agree' ? "Advancing to next question…" : "Your feedback has been recorded." });
     setOverlayNodeId(null);
     pendingAdvanceRef.current = true;
-  }, [overlayNodeId, respond]);
+  }, [overlayNodeId, respond, toast]);
+
+  // Feature 4: Focus management — return focus to start button when overlay closes
+  const handleOverlayClose = useCallback(() => {
+    setOverlayNodeId(null);
+    setDiagnosticReady(false);
+    setPendingResponse(null);
+    setNoteText("");
+    setEditingResponse(false);
+    // Return focus to start/resume button
+    setTimeout(() => startButtonRef.current?.focus(), 100);
+  }, []);
 
   // Precompute groupings (same as SpineMap)
   const { branchCountBySpine } = useMemo(() => {
@@ -208,8 +262,21 @@ export default function Diagnostic() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // D3 rendering
+  // Feature 3: Mobile grouped nodes
+  const nodesByTier = useMemo(() => {
+    if (!nodes) return new Map<number, NodeRecord[]>();
+    const map = new Map<number, NodeRecord[]>();
+    nodes.forEach((n) => {
+      const tier = n.tier ?? 0;
+      if (!map.has(tier)) map.set(tier, []);
+      map.get(tier)!.push(n);
+    });
+    return map;
+  }, [nodes]);
+
+  // D3 rendering (skip on mobile)
   useEffect(() => {
+    if (isMobile) return;
     if (!nodes || !svgRef.current || !containerRef.current) return;
 
     const containerWidth = containerRef.current.clientWidth;
@@ -399,7 +466,7 @@ export default function Diagnostic() {
       })
       .on("click", (_event, d) => {
         if (!isUnlocked(d.id)) return;
-        if (selectedNodeId === d.navigateId) setOverlayNodeId(d.navigateId);
+        if (selectedNodeId === d.navigateId) { setOverlayNodeId(d.navigateId); setEditingResponse(false); }
         else setSelectedNodeId(d.navigateId);
       });
 
@@ -440,7 +507,7 @@ export default function Diagnostic() {
       })
       .on("click", (_event, d) => {
         if (!isUnlocked(d.id)) return;
-        if (selectedNodeId === d.navigateId) setOverlayNodeId(d.navigateId);
+        if (selectedNodeId === d.navigateId) { setOverlayNodeId(d.navigateId); setEditingResponse(false); }
         else setSelectedNodeId(d.navigateId);
       });
 
@@ -456,10 +523,24 @@ export default function Diagnostic() {
     if (isRestoringZoom) badgeG.attr("opacity", 1);
     else badgeG.transition().duration(400).delay((_d, i) => 600 + i * 40).attr("opacity", 1);
 
-  }, [nodes, collapsedTiers, matchingIds, toggleTier, branchCountBySpine, ancestorPathIds, selectedNodeId, unlockedIds, respondedIds, responseMap]);
+  }, [nodes, collapsedTiers, matchingIds, toggleTier, branchCountBySpine, ancestorPathIds, selectedNodeId, unlockedIds, respondedIds, responseMap, isMobile]);
+
+  // Current overlay node info for accessibility and response editing
+  const overlayNode = useMemo(() => {
+    if (!overlayNodeId || !nodes) return null;
+    return nodes.find((n) => n.id.toLowerCase() === overlayNodeId.toLowerCase()) ?? null;
+  }, [overlayNodeId, nodes]);
+
+  const previousResponse = overlayNodeId ? responseMap.get(overlayNodeId.toLowerCase()) : undefined;
+  const showResponseButtons = !previousResponse || editingResponse;
 
   return (
     <AppLayout>
+      {/* Feature 4: aria-live region for screen readers */}
+      <div aria-live="polite" className="sr-only">
+        {overlayNode ? `Now viewing: ${overlayNode.title}` : ""}
+      </div>
+
       <div className="px-4 py-6 max-w-[1600px] mx-auto">
         <div className="flex items-center justify-between mb-2 gap-3">
           <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground shrink-0">
@@ -482,11 +563,22 @@ export default function Diagnostic() {
           </div>
         )}
 
-        <p className="text-muted-foreground text-sm mb-4">
+        <p className="text-muted-foreground text-sm mb-3">
           {selectedNodeId
             ? "Path highlighted — click the selected node again to open it. Press Esc to clear."
             : "Begin at S-01 (bottom). Respond to unlock the next nodes in the journey."}
         </p>
+
+        {/* Feature 1: Progress indicator */}
+        {totalNodes > 0 && (
+          <div className="mb-4 space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{answeredCount} of {totalNodes} answered</span>
+              <span>{progressPercent}%</span>
+            </div>
+            <Progress value={progressPercent} className="h-2" />
+          </div>
+        )}
 
         {/* Legend */}
         <div className="flex flex-wrap gap-3 mb-4">
@@ -510,9 +602,85 @@ export default function Diagnostic() {
 
         {isLoading ? (
           <div className="flex items-center justify-center h-[500px] text-muted-foreground">Loading nodes…</div>
+        ) : isMobile ? (
+          /* Feature 3: Mobile card list view */
+          <div className="space-y-3">
+            {/* Start / Resume button */}
+            {!overlayNodeId && (
+              <div className="flex justify-center mb-4">
+                <Button
+                  ref={startButtonRef}
+                  size="lg"
+                  className="text-base px-8 py-6 shadow-xl gap-2"
+                  disabled={journeyComplete}
+                  onClick={openNextNode}
+                >
+                  {respondedIds.size === 0 ? (
+                    <><Play className="w-5 h-5" /> Start Diagnostic</>
+                  ) : journeyComplete ? (
+                    <><CheckCircle2 className="w-5 h-5" /> Journey Complete</>
+                  ) : (
+                    <><RotateCcw className="w-5 h-5" /> Resume Diagnostic</>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {Array.from(nodesByTier.entries())
+              .sort(([a], [b]) => a - b)
+              .map(([tier, tierNodes]) => (
+                <Collapsible key={tier} defaultOpen={tier === 0}>
+                  <CollapsibleTrigger className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left font-semibold text-sm transition-colors hover:bg-accent/50" style={{ color: TIER_COLORS[tier] }}>
+                    <ChevronDown className="w-4 h-4 shrink-0 transition-transform duration-200 [[data-state=closed]>&]:rotate-[-90deg]" />
+                    <span>T{tier}: {TIER_LABELS[tier] ?? `Tier ${tier}`}</span>
+                    <span className="ml-auto text-xs font-normal text-muted-foreground">{tierNodes.length} nodes</span>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="space-y-2 pt-2 pl-2">
+                      {tierNodes.map((node) => {
+                        const unlocked = unlockedIds.has(node.id.toLowerCase());
+                        const responded = respondedIds.has(node.id.toLowerCase());
+                        const response = responseMap.get(node.id.toLowerCase());
+                        return (
+                          <button
+                            key={node.id}
+                            onClick={() => {
+                              if (!unlocked) return;
+                              setOverlayNodeId(node.id);
+                              setEditingResponse(false);
+                              setDiagnosticReady(false);
+                            }}
+                            disabled={!unlocked}
+                            className="w-full text-left px-4 py-3 rounded-lg border border-border transition-colors flex items-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/50"
+                          >
+                            {!unlocked ? (
+                              <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
+                            ) : responded && response ? (
+                              <span className="w-4 h-4 rounded-full shrink-0 border-2" style={{ borderColor: RESPONSE_COLORS[response] }} />
+                            ) : (
+                              <span className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: TIER_COLORS[tier] }} />
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm text-foreground truncate">{node.title}</p>
+                              <p className="text-xs text-muted-foreground">{node.id.toUpperCase()}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              ))}
+          </div>
         ) : (
-          <div ref={containerRef} className="relative w-full border border-border rounded-lg bg-card overflow-hidden">
-            <svg ref={svgRef} className="w-full" style={{ height: "calc(100vh - 280px)", minHeight: 600 }} />
+          /* Desktop D3 graph */
+          <div
+            ref={containerRef}
+            className="relative w-full border border-border rounded-lg bg-card overflow-hidden"
+            role="img"
+            aria-label="Diagnostic journey graph showing nodes organized by tiers"
+          >
+            <svg ref={svgRef} className="w-full" style={{ height: "calc(100vh - 320px)", minHeight: 600 }} />
             {tooltip && (
               <div className="absolute pointer-events-none z-50 px-3 py-1.5 rounded-md bg-popover text-popover-foreground text-xs shadow-lg border border-border max-w-[280px] whitespace-normal break-words" style={{ left: 0, top: 0, transform: `translate(${tooltip.x + 14}px, ${tooltip.y - 10}px)` }}>
                 {tooltip.text}
@@ -522,6 +690,7 @@ export default function Diagnostic() {
             {!overlayNodeId && !showWelcome && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                 <Button
+                  ref={startButtonRef}
                   size="lg"
                   className="pointer-events-auto text-base px-8 py-6 shadow-xl gap-2"
                   disabled={journeyComplete}
@@ -542,12 +711,23 @@ export default function Diagnostic() {
       </div>
 
       {/* Diagnostic overlay with response buttons */}
-      <Dialog open={!!overlayNodeId} onOpenChange={(open) => { if (!open) { setOverlayNodeId(null); setDiagnosticReady(false); setPendingResponse(null); setNoteText(""); } }}>
+      <Dialog open={!!overlayNodeId} onOpenChange={(open) => { if (!open) handleOverlayClose(); }}>
         <DialogContent className="max-w-2xl p-0 gap-0 border-none bg-transparent shadow-none [&>button]:hidden">
-          <DialogTitle className="sr-only">Node Detail</DialogTitle>
+          <DialogTitle className="sr-only">{overlayNode?.title ?? "Node Detail"}</DialogTitle>
           <div className="relative">
-            {/* Main content card */}
-            <div className="bg-background border border-border rounded-lg shadow-lg overflow-hidden">
+            {/* Main content card with fade transition (Feature 2) */}
+            <div className={`bg-background border border-border rounded-lg shadow-lg overflow-hidden transition-opacity duration-300 ${transitioning ? 'opacity-0' : 'opacity-100'}`}>
+              {/* Feature 7: Next-up banner */}
+              {nextUpTitle && (
+                <div
+                  className="px-4 py-2 text-sm font-medium text-primary-foreground animate-fade-in flex items-center gap-2"
+                  style={{ backgroundColor: overlayNode ? TIER_COLORS[overlayNode.tier ?? 0] : "hsl(var(--primary))" }}
+                >
+                  <span>Next:</span>
+                  <span className="truncate">{nextUpTitle}</span>
+                </div>
+              )}
+
               <div className="overflow-y-auto max-h-[60vh] p-6">
                 {overlayNodeId && (
                   <NodeDetailContent
@@ -556,6 +736,7 @@ export default function Diagnostic() {
                       if (unlockedIds.has(nodeId.toLowerCase())) {
                         setOverlayNodeId(nodeId);
                         setDiagnosticReady(false);
+                        setEditingResponse(false);
                       }
                     }}
                     diagnosticMode
@@ -566,7 +747,7 @@ export default function Diagnostic() {
 
               {/* Close button */}
               <button
-                onClick={() => { setOverlayNodeId(null); setDiagnosticReady(false); }}
+                onClick={handleOverlayClose}
                 className="absolute top-3 right-3 z-10 rounded-sm p-1 opacity-70 hover:opacity-100 transition-opacity bg-background border border-border shadow-sm"
                 aria-label="Close"
               >
@@ -574,72 +755,102 @@ export default function Diagnostic() {
               </button>
             </div>
 
-            {/* Response buttons or note field below modal */}
-            {overlayNodeId && responseMap.get(overlayNodeId.toLowerCase()) !== 'agree' && (
+            {/* Response section below modal */}
+            {overlayNodeId && (
               <div className="mt-4 pb-4">
-                {pendingResponse ? (
-                  <div className="bg-background border border-border rounded-lg p-4 space-y-3">
-                    <Textarea
-                      value={noteText}
-                      onChange={(e) => setNoteText(e.target.value)}
-                      placeholder={pendingResponse === 'disagree' ? "Explain why you disagree..." : "What are you struggling with?"}
-                      className="min-h-[80px] resize-none"
-                      autoFocus
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => { setPendingResponse(null); setNoteText(""); }}
-                        className="px-4 py-2 text-sm font-medium rounded-md border border-border bg-background hover:bg-accent transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleResponse(pendingResponse, noteText)}
-                        disabled={!noteText.trim()}
-                        className="px-4 py-2 text-sm font-medium rounded-md text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                        style={{ backgroundColor: pendingResponse === 'disagree' ? RESPONSE_COLORS.disagree : RESPONSE_COLORS.dont_know }}
-                      >
-                        Submit
-                      </button>
+                {/* Feature 6: Previous response banner */}
+                {previousResponse && !editingResponse && (
+                  <div className="bg-background border border-border rounded-lg p-4 flex items-center justify-between animate-fade-in">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: RESPONSE_COLORS[previousResponse] }} />
+                      <span className="text-sm font-medium text-foreground">You responded: {RESPONSE_LABELS[previousResponse]}</span>
                     </div>
+                    <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => setEditingResponse(true)}>
+                      <Edit3 className="w-3.5 h-3.5" />
+                      Change
+                    </Button>
                   </div>
-                ) : (
-                  <div className="flex justify-center items-start gap-4">
-                    <button
-                      onClick={() => setPendingResponse('disagree')}
-                      disabled={!diagnosticReady}
-                      className="flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
-                      aria-label="Disagree"
-                    >
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.disagree }}>
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5l-10 10" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
-                      </div>
-                      <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.disagree }}>Disagree</span>
-                    </button>
+                )}
 
-                    <button
-                      onClick={() => setPendingResponse('dont_know')}
-                      disabled={!diagnosticReady}
-                      className="flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
-                      aria-label="I Don't Know"
-                    >
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.dont_know }}>
-                        <span className="text-white font-bold text-lg">?</span>
+                {/* Response buttons */}
+                {showResponseButtons && (
+                  <>
+                    {pendingResponse ? (
+                      <div className="bg-background border border-border rounded-lg p-4 space-y-3 animate-fade-in">
+                        <Textarea
+                          value={noteText}
+                          onChange={(e) => setNoteText(e.target.value)}
+                          placeholder={pendingResponse === 'disagree' ? "Explain why you disagree..." : "What are you struggling with?"}
+                          className="min-h-[80px] resize-none"
+                          autoFocus
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => { setPendingResponse(null); setNoteText(""); if (previousResponse) setEditingResponse(false); }}
+                            className="px-4 py-2 text-sm font-medium rounded-md border border-border bg-background hover:bg-accent transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleResponse(pendingResponse, noteText)}
+                            disabled={!noteText.trim()}
+                            className="px-4 py-2 text-sm font-medium rounded-md text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            style={{ backgroundColor: pendingResponse === 'disagree' ? RESPONSE_COLORS.disagree : RESPONSE_COLORS.dont_know }}
+                          >
+                            Submit
+                          </button>
+                        </div>
                       </div>
-                      <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.dont_know }}>Don't Know</span>
-                    </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex justify-center items-start gap-4">
+                          <button
+                            onClick={() => setPendingResponse('disagree')}
+                            disabled={!diagnosticReady}
+                            className="flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
+                            aria-label="Disagree"
+                            aria-describedby={!diagnosticReady ? "helper-text" : undefined}
+                          >
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.disagree }}>
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5l-10 10" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
+                            </div>
+                            <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.disagree }}>Disagree</span>
+                          </button>
 
-                    <button
-                      onClick={() => handleResponse('agree')}
-                      className="flex flex-col items-center gap-1 group"
-                      aria-label="Agree"
-                    >
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.agree }}>
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          <button
+                            onClick={() => setPendingResponse('dont_know')}
+                            disabled={!diagnosticReady}
+                            className="flex flex-col items-center gap-1 group disabled:opacity-40 disabled:cursor-not-allowed"
+                            aria-label="I Don't Know"
+                            aria-describedby={!diagnosticReady ? "helper-text" : undefined}
+                          >
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.dont_know }}>
+                              <span className="text-white font-bold text-lg">?</span>
+                            </div>
+                            <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.dont_know }}>Don't Know</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleResponse('agree')}
+                            className="flex flex-col items-center gap-1 group"
+                            aria-label="Agree"
+                          >
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110" style={{ backgroundColor: RESPONSE_COLORS.agree }}>
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 10l3 3 7-7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </div>
+                            <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.agree }}>Agree</span>
+                          </button>
+                        </div>
+
+                        {/* Feature 5: Helper text for gated buttons */}
+                        {!diagnosticReady && (
+                          <p id="helper-text" className="text-center text-xs text-muted-foreground animate-fade-in">
+                            Scroll through all content &amp; expand reasoning to unlock Disagree / Don't Know
+                          </p>
+                        )}
                       </div>
-                      <span className="text-xs font-medium" style={{ color: RESPONSE_COLORS.agree }}>Agree</span>
-                    </button>
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -662,6 +873,7 @@ export default function Diagnostic() {
                   setShowRouteChoice(false);
                   setOverlayNodeId(node.id);
                   setDiagnosticReady(false);
+                  setEditingResponse(false);
                 }}
                 className="w-full text-left px-4 py-3 rounded-lg border border-border hover:bg-accent transition-colors flex items-center gap-3"
               >
