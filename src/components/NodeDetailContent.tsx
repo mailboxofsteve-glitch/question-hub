@@ -78,6 +78,8 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
   const [openedAccordionIds, setOpenedAccordionIds] = useState<Set<string>>(new Set());
   const [reasoningOpened, setReasoningOpened] = useState(false);
   const contentEndRef = useRef<HTMLDivElement>(null);
+  const scrollBottomTrackedRef = useRef<string | null>(null);
+  const pageLoadTimeRef = useRef<number>(Date.now());
 
   const { data: node, isLoading, error } = useQuery({
     queryKey: ['node-detail', id],
@@ -143,6 +145,8 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
     setHasScrolledToBottom(false);
     setOpenedAccordionIds(new Set());
     setReasoningOpened(false);
+    scrollBottomTrackedRef.current = null;
+    pageLoadTimeRef.current = Date.now();
   }, [id]);
 
   // Intersection observer to detect scroll-to-bottom
@@ -376,7 +380,8 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
         </section>
       )}
       {/* Sentinel for scroll tracking */}
-      {diagnosticMode && <div ref={contentEndRef} className="h-1" />}
+      {/* Sentinel for scroll tracking */}
+      <div ref={contentEndRef} className="h-1" />
     </div>
   );
 };
