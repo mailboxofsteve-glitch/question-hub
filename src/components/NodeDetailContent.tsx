@@ -151,14 +151,25 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
 
   // Intersection observer to detect scroll-to-bottom
   useEffect(() => {
-    if (!diagnosticMode || !contentEndRef.current) return;
+    if (!contentEndRef.current) return;
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setHasScrolledToBottom(true); },
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setHasScrolledToBottom(true);
+          // Track scroll_to_bottom once per node view
+          if (node?.id && scrollBottomTrackedRef.current !== node.id) {
+            scrollBottomTrackedRef.current = node.id;
+            trackEvent('scroll_to_bottom', node.id, {
+              time_on_page_ms: Date.now() - pageLoadTimeRef.current,
+            });
+          }
+        }
+      },
       { threshold: 0.5 },
     );
     observer.observe(contentEndRef.current);
     return () => observer.disconnect();
-  }, [diagnosticMode, node?.id]);
+  }, [node?.id]);
 
 
   const trackedRef = useRef<string | null>(null);
