@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import NodePreview from "./pages/NodePreview";
 import SpineMap from "./pages/SpineMap";
 import Diagnostic from "./pages/Diagnostic";
+import Analytics from "./pages/Analytics";
 import RouteAnnouncer from "./components/RouteAnnouncer";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/admin" element={<Admin />} />
           <Route path="/graph" element={<SpineMap />} />
           <Route path="/diagnostic" element={<Diagnostic />} />
+          <Route path="/analytics" element={<Analytics />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
