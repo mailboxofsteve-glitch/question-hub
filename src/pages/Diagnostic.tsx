@@ -144,6 +144,15 @@ export default function Diagnostic() {
 
   const journeyComplete = availableNodes.length === 0 && respondedIds.size > 0;
 
+  // Track diagnostic_complete
+  const completedTrackedRef = useRef(false);
+  useEffect(() => {
+    if (journeyComplete && !completedTrackedRef.current) {
+      completedTrackedRef.current = true;
+      trackEvent('diagnostic_complete', null, { total_nodes: totalNodes });
+    }
+  }, [journeyComplete]);
+
   // Feature 1: Progress indicator
   const totalNodes = nodes?.length ?? 0;
   const answeredCount = respondedIds.size;
