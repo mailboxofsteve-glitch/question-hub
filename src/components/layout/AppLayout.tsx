@@ -52,13 +52,22 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         Graph
       </Link>
       {!loading && user && (isAdmin || isEditor) && (
-        <Link
-          to="/admin"
-          className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          onClick={() => setMobileOpen(false)}
-        >
-          Node Admin
-        </Link>
+        <>
+          <Link
+            to="/admin"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setMobileOpen(false)}
+          >
+            Node Admin
+          </Link>
+          <Link
+            to="/analytics"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setMobileOpen(false)}
+          >
+            Analytics
+          </Link>
+        </>
       )}
     </>
   );
