@@ -1,61 +1,56 @@
 
 
-## Diagnostic Journey: 7 UX Improvements
+## Analytics Dashboard
 
-### 1. Progress Indicator
-Add a progress bar and counter ("3 of 14 answered") to the header area, visible at all times. Uses `respondedIds.size` / total published node count. Renders a `Progress` component + text below the page title.
+A new `/analytics` page accessible only to users with the `admin` or `editor` role, showing real-time application usage data from the `events` table.
 
-**File**: `src/pages/Diagnostic.tsx` — add progress bar between the subtitle text and legend section.
+### Database Changes
 
-### 2. Smooth Node Transitions
-When auto-advancing between nodes, apply a CSS fade transition instead of an instant swap. Track a `transitioning` state: when switching nodes, briefly set it to trigger a fade-out, update `overlayNodeId`, then fade-in.
+1. **Add SELECT policy on `events` table** for admin/editor roles so the dashboard can query event data directly:
+```sql
+CREATE POLICY "Admins and editors can read events"
+  ON public.events FOR SELECT
+  USING (
+    public.has_role(auth.uid(), 'admin')
+    OR public.has_role(auth.uid(), 'editor')
+  );
+```
 
-**File**: `src/pages/Diagnostic.tsx` — add `transitioning` state, wrap the modal content div with a CSS class that toggles `opacity-0`/`opacity-100` with `transition-opacity duration-300`. Show a "Next: [title]" label briefly during transition.
+No new tables needed — all data comes from the existing `events` table.
 
-### 3. Mobile Card List View
-On mobile (`useIsMobile()`), replace the D3 SVG graph with a vertical scrollable list of nodes grouped by tier. Each card shows: node title, ID, lock/response status icon, and is tappable. The Start/Resume button remains at the top.
+### New Page: `src/pages/Analytics.tsx`
 
-**File**: `src/pages/Diagnostic.tsx` — import `useIsMobile`, conditionally render either the SVG graph or a new `MobileNodeList` section. Each tier is a collapsible group with node cards inside.
+Role-gated page (same pattern as `Admin.tsx`) with the following dashboard sections:
 
-### 4. Accessibility Enhancements
-- Wrap SVG container with `role="img"` and `aria-label="Diagnostic journey graph"`
-- Add `aria-live="polite"` region that announces the current node title when overlay opens
-- Focus management: auto-focus the close button when modal opens; return focus to the Start/Resume button on close
-- Response buttons get explicit `role="button"` and `aria-describedby` linking to helper text
+**Header Stats (cards across the top):**
+- Total sessions (distinct `session_id` count)
+- Total page views
+- Unique nodes viewed
+- Diagnostic completions
 
-**File**: `src/pages/Diagnostic.tsx` — add ARIA attributes, ref for start button, manage focus in overlay open/close handlers.
+**Charts (using recharts, already installed):**
+1. **Traffic Over Time** — line chart of events per day (last 30 days)
+2. **Event Type Breakdown** — bar chart showing count per `event_type`
+3. **Top Viewed Nodes** — horizontal bar chart of most-viewed nodes by `view_node` count
+4. **Device Breakdown** — pie chart from `session_start` metadata (`is_mobile` true/false)
+5. **Diagnostic Funnel** — bar chart showing `diagnostic_start` → `diagnostic_respond` → `diagnostic_complete` drop-off
 
-### 5. Feedback & Guidance
-- Below disabled Disagree/Don't Know buttons, show helper text: "Scroll through all content & expand reasoning to unlock" (only when `!diagnosticReady`)
-- After a response is saved, show a brief toast: "Response saved — advancing..."
-- The helper text fades away once `diagnosticReady` becomes true
+**Live Events Feed:**
+- A scrollable table of the most recent 50 events with timestamp, type, node_id, and session_id
+- Uses Supabase realtime subscription on the `events` table for live updates
 
-**File**: `src/pages/Diagnostic.tsx` — add conditional helper text below the response button row, add toast call in `handleResponse`.
+### Code Changes
 
-### 6. Response Editing
-Currently, the condition `responseMap.get(overlayNodeId.toLowerCase()) !== 'agree'` hides response buttons for agreed nodes. Change this to:
-- Always show the previous response when reopening a responded node (e.g., "You responded: Agree ✓")
-- Add a "Change Response" button that reveals the response buttons again
-- Track `editingResponse` state to toggle between "view previous" and "edit" mode
+| File | Change |
+|------|--------|
+| `src/pages/Analytics.tsx` | New page with role gate, stats cards, charts, live feed |
+| `src/App.tsx` | Add route `/analytics` |
+| `src/components/layout/AppLayout.tsx` | Add "Analytics" nav link for admin/editor users |
+| Migration SQL | Add SELECT policy on `events` for admin/editor |
 
-**File**: `src/pages/Diagnostic.tsx` — add `editingResponse` state, render previous-response banner with change button, conditionally show response buttons.
-
-### 7. Contextual "Next Up" Banner
-During auto-advance, show a brief banner at the top of the modal content: "Next: [node title]" with the tier color accent. This orients the user that the content has changed. The banner auto-dismisses after 2 seconds.
-
-**File**: `src/pages/Diagnostic.tsx` — add `nextUpTitle` state set during advance, render a dismissible banner inside the modal card, clear via setTimeout.
-
----
-
-### Summary of State Additions
-| State | Purpose |
-|-------|---------|
-| `transitioning: boolean` | Controls fade animation between nodes |
-| `editingResponse: boolean` | Toggles response-editing mode for responded nodes |
-| `nextUpTitle: string \| null` | Shows "Next: ..." banner during auto-advance |
-
-### Files Modified
-| File | Changes |
-|------|---------|
-| `src/pages/Diagnostic.tsx` | All 7 features: progress bar, transitions, mobile view, a11y, guidance, editing, next-up banner |
+### Technical Notes
+- Data fetching via `supabase.from('events').select(...)` with date filters
+- Aggregation done client-side (events table should be manageable size)
+- Realtime via `supabase.channel('events').on('postgres_changes', ...)` for the live feed
+- Realtime requires: `ALTER PUBLICATION supabase_realtime ADD TABLE public.events;`
 
