@@ -905,6 +905,10 @@ export default function Diagnostic() {
               <button
                 key={node.id}
                 onClick={() => {
+                  trackEvent('diagnostic_route_choice', node.id, {
+                    chosen_node_id: node.id,
+                    available_count: availableNodes.length,
+                  });
                   setShowRouteChoice(false);
                   setOverlayNodeId(node.id);
                   setDiagnosticReady(false);
