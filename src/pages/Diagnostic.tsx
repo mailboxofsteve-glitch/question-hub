@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
+import { trackEvent } from "@/lib/analytics";
 
 interface NodeRecord {
   id: string;
@@ -83,9 +84,19 @@ export default function Diagnostic() {
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
+  const diagnosticStartedRef = useRef(false);
+
   const dismissWelcome = useCallback(() => {
     localStorage.setItem('diagnostic-welcome-seen', '1');
     setShowWelcome(false);
+  }, []);
+
+  // Track diagnostic_start once per session
+  useEffect(() => {
+    if (!diagnosticStartedRef.current) {
+      diagnosticStartedRef.current = true;
+      trackEvent('diagnostic_start');
+    }
   }, []);
 
   const { user } = useAuth();
@@ -133,6 +144,15 @@ export default function Diagnostic() {
 
   const journeyComplete = availableNodes.length === 0 && respondedIds.size > 0;
 
+  // Track diagnostic_complete
+  const completedTrackedRef = useRef(false);
+  useEffect(() => {
+    if (journeyComplete && !completedTrackedRef.current) {
+      completedTrackedRef.current = true;
+      trackEvent('diagnostic_complete', null, { total_nodes: totalNodes });
+    }
+  }, [journeyComplete]);
+
   // Feature 1: Progress indicator
   const totalNodes = nodes?.length ?? 0;
   const answeredCount = respondedIds.size;
@@ -178,6 +198,21 @@ export default function Diagnostic() {
 
   const handleResponse = useCallback((response: DiagnosticResponse, note?: string) => {
     if (!overlayNodeId) return;
+
+    // Track diagnostic response (edit vs new)
+    const previousResponse = responseMap.get(overlayNodeId.toLowerCase());
+    if (previousResponse) {
+      trackEvent('diagnostic_edit_response', overlayNodeId, {
+        old_response: previousResponse,
+        new_response: response,
+      });
+    } else {
+      trackEvent('diagnostic_respond', overlayNodeId, {
+        response,
+        has_note: !!note,
+      });
+    }
+
     respond(overlayNodeId, response, note);
     setPendingResponse(null);
     setNoteText("");
@@ -187,7 +222,7 @@ export default function Diagnostic() {
     toast({ title: "Response saved", description: response === 'agree' ? "Advancing to next question…" : "Your feedback has been recorded." });
     setOverlayNodeId(null);
     pendingAdvanceRef.current = true;
-  }, [overlayNodeId, respond, toast]);
+  }, [overlayNodeId, respond, toast, responseMap]);
 
   // Feature 4: Focus management — return focus to start button when overlay closes
   const handleOverlayClose = useCallback(() => {
@@ -870,6 +905,10 @@ export default function Diagnostic() {
               <button
                 key={node.id}
                 onClick={() => {
+                  trackEvent('diagnostic_route_choice', node.id, {
+                    chosen_node_id: node.id,
+                    available_count: availableNodes.length,
+                  });
                   setShowRouteChoice(false);
                   setOverlayNodeId(node.id);
                   setDiagnosticReady(false);

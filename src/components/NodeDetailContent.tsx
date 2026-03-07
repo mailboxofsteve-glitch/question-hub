@@ -78,6 +78,8 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
   const [openedAccordionIds, setOpenedAccordionIds] = useState<Set<string>>(new Set());
   const [reasoningOpened, setReasoningOpened] = useState(false);
   const contentEndRef = useRef<HTMLDivElement>(null);
+  const scrollBottomTrackedRef = useRef<string | null>(null);
+  const pageLoadTimeRef = useRef<number>(Date.now());
 
   const { data: node, isLoading, error } = useQuery({
     queryKey: ['node-detail', id],
@@ -143,18 +145,31 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
     setHasScrolledToBottom(false);
     setOpenedAccordionIds(new Set());
     setReasoningOpened(false);
+    scrollBottomTrackedRef.current = null;
+    pageLoadTimeRef.current = Date.now();
   }, [id]);
 
   // Intersection observer to detect scroll-to-bottom
   useEffect(() => {
-    if (!diagnosticMode || !contentEndRef.current) return;
+    if (!contentEndRef.current) return;
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setHasScrolledToBottom(true); },
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setHasScrolledToBottom(true);
+          // Track scroll_to_bottom once per node view
+          if (node?.id && scrollBottomTrackedRef.current !== node.id) {
+            scrollBottomTrackedRef.current = node.id;
+            trackEvent('scroll_to_bottom', node.id, {
+              time_on_page_ms: Date.now() - pageLoadTimeRef.current,
+            });
+          }
+        }
+      },
       { threshold: 0.5 },
     );
     observer.observe(contentEndRef.current);
     return () => observer.disconnect();
-  }, [diagnosticMode, node?.id]);
+  }, [node?.id]);
 
 
   const trackedRef = useRef<string | null>(null);
@@ -170,6 +185,7 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
     try {
       const url = `${window.location.origin}/node/${id}`;
       await navigator.clipboard.writeText(url);
+      trackEvent('copy_share_link', id);
       toast({ title: 'Link copied', description: 'URL copied to clipboard.' });
     } catch {
       toast({ title: 'Copy failed', description: 'Could not copy the link.', variant: 'destructive' });
@@ -375,7 +391,8 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
         </section>
       )}
       {/* Sentinel for scroll tracking */}
-      {diagnosticMode && <div ref={contentEndRef} className="h-1" />}
+      {/* Sentinel for scroll tracking */}
+      <div ref={contentEndRef} className="h-1" />
     </div>
   );
 };

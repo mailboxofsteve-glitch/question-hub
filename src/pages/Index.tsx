@@ -4,6 +4,7 @@ import { useRef, useCallback, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useNodeSearch } from "@/hooks/use-node-search";
 import { useRecentlyViewed } from "@/hooks/use-recently-viewed";
+import { trackEvent } from "@/lib/analytics";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const SearchSkeleton = () => (
@@ -173,6 +174,7 @@ const Index = () => {
                     <Link
                       key={item.id}
                       to={`/node/${item.id}`}
+                      onClick={() => trackEvent('click_recently_viewed', item.id, { target_node_id: item.id })}
                       className="flex items-center justify-between gap-3 surface-elevated rounded-lg p-4 border border-border hover:border-accent/40 hover:glow-amber transition-all duration-200 group"
                     >
                       <div className="flex-1 min-w-0">
@@ -221,7 +223,10 @@ const Index = () => {
                   {categories.map((cat) => (
                     <button
                       key={cat}
-                      onClick={() => setSelectedCategory(cat)}
+                      onClick={() => {
+                        trackEvent('click_category', null, { category: cat });
+                        setSelectedCategory(cat);
+                      }}
                       aria-label={`Browse category: ${cat}`}
                       className="p-4 rounded-lg border border-border surface-elevated text-left hover:border-accent/40 hover:glow-amber transition-all duration-200 group"
                     >

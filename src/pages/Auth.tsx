@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/use-auth';
+import { trackEvent } from '@/lib/analytics';
 
 const Auth = () => {
   const { user, loading: authLoading } = useAuth();
@@ -32,7 +33,11 @@ const Auth = () => {
     setError('');
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
+    if (error) {
+      setError(error.message);
+    } else {
+      trackEvent('sign_in', null, { method: 'email' });
+    }
     setLoading(false);
   };
 
@@ -49,6 +54,7 @@ const Auth = () => {
     if (error) {
       setError(error.message);
     } else {
+      trackEvent('sign_up', null, { method: 'email' });
       setMessage('Check your email for a confirmation link.');
     }
     setLoading(false);
@@ -59,7 +65,11 @@ const Auth = () => {
     const { error } = await lovable.auth.signInWithOAuth('google', {
       redirect_uri: window.location.origin,
     });
-    if (error) setError(error.message);
+    if (error) {
+      setError(error.message);
+    } else {
+      trackEvent('sign_in', null, { method: 'google' });
+    }
   };
 
   if (authLoading) {
