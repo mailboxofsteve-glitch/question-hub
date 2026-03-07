@@ -170,6 +170,7 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
     try {
       const url = `${window.location.origin}/node/${id}`;
       await navigator.clipboard.writeText(url);
+      trackEvent('copy_share_link', id);
       toast({ title: 'Link copied', description: 'URL copied to clipboard.' });
     } catch {
       toast({ title: 'Copy failed', description: 'Could not copy the link.', variant: 'destructive' });
