@@ -68,6 +68,50 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback_reviews: {
+        Row: {
+          addressed: boolean
+          addressed_at: string | null
+          addressed_by: string | null
+          diagnostic_progress_id: string
+          id: string
+          resolution_note: string | null
+          reviewed: boolean
+          reviewed_at: string | null
+          reviewed_by: string | null
+        }
+        Insert: {
+          addressed?: boolean
+          addressed_at?: string | null
+          addressed_by?: string | null
+          diagnostic_progress_id: string
+          id?: string
+          resolution_note?: string | null
+          reviewed?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+        }
+        Update: {
+          addressed?: boolean
+          addressed_at?: string | null
+          addressed_by?: string | null
+          diagnostic_progress_id?: string
+          id?: string
+          resolution_note?: string | null
+          reviewed?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_reviews_diagnostic_progress_id_fkey"
+            columns: ["diagnostic_progress_id"]
+            isOneToOne: true
+            referencedRelation: "diagnostic_progress"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nodes: {
         Row: {
           alt_phrasings: Json | null
