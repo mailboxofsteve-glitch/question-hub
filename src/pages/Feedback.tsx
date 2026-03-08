@@ -132,19 +132,26 @@ const Feedback = () => {
   const upsertReview = async (
     progressId: string,
     updates: Record<string, unknown>
-  ) => {
+  ): Promise<string> => {
     const existing = rows.find((r) => r.id === progressId);
-    if (existing?.review_id) {
+    if (existing?.review_id && existing.review_id !== 'temp') {
       const { error } = await supabase
         .from('feedback_reviews')
         .update(updates)
         .eq('id', existing.review_id);
       if (error) throw error;
+      return existing.review_id;
     } else {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('feedback_reviews')
-        .insert({ diagnostic_progress_id: progressId, ...updates } as any);
+        .upsert(
+          { diagnostic_progress_id: progressId, ...updates } as any,
+          { onConflict: 'diagnostic_progress_id' }
+        )
+        .select('id')
+        .single();
       if (error) throw error;
+      return data.id;
     }
   };
 
