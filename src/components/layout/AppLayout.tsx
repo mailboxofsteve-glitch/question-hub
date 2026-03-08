@@ -67,6 +67,13 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           >
             Analytics
           </Link>
+          <Link
+            to="/feedback"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setMobileOpen(false)}
+          >
+            Feedback
+          </Link>
         </>
       )}
     </>
