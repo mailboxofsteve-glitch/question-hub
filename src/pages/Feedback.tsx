@@ -158,7 +158,7 @@ const Feedback = () => {
   const toggleReviewed = async (row: FeedbackRow) => {
     try {
       const newVal = !row.reviewed;
-      await upsertReview(row.id, {
+      const reviewId = await upsertReview(row.id, {
         reviewed: newVal,
         reviewed_by: newVal ? user!.id : null,
         reviewed_at: newVal ? new Date().toISOString() : null,
@@ -166,7 +166,7 @@ const Feedback = () => {
       setRows((prev) =>
         prev.map((r) =>
           r.id === row.id
-            ? { ...r, reviewed: newVal, reviewed_by: newVal ? user!.id : null, reviewed_at: newVal ? new Date().toISOString() : null }
+            ? { ...r, review_id: reviewId, reviewed: newVal, reviewed_by: newVal ? user!.id : null, reviewed_at: newVal ? new Date().toISOString() : null }
             : r
         )
       );
@@ -179,7 +179,7 @@ const Feedback = () => {
     if (!isEditor) return;
     try {
       const newVal = !row.addressed;
-      await upsertReview(row.id, {
+      const reviewId = await upsertReview(row.id, {
         addressed: newVal,
         addressed_by: newVal ? user!.id : null,
         addressed_at: newVal ? new Date().toISOString() : null,
@@ -187,7 +187,7 @@ const Feedback = () => {
       setRows((prev) =>
         prev.map((r) =>
           r.id === row.id
-            ? { ...r, addressed: newVal, addressed_by: newVal ? user!.id : null, addressed_at: newVal ? new Date().toISOString() : null }
+            ? { ...r, review_id: reviewId, addressed: newVal, addressed_by: newVal ? user!.id : null, addressed_at: newVal ? new Date().toISOString() : null }
             : r
         )
       );
@@ -199,9 +199,9 @@ const Feedback = () => {
   const saveResolutionNote = async (row: FeedbackRow) => {
     if (!isEditor) return;
     try {
-      await upsertReview(row.id, { resolution_note: noteValue });
+      const reviewId = await upsertReview(row.id, { resolution_note: noteValue });
       setRows((prev) =>
-        prev.map((r) => (r.id === row.id ? { ...r, resolution_note: noteValue, review_id: r.review_id || 'temp' } : r))
+        prev.map((r) => (r.id === row.id ? { ...r, resolution_note: noteValue, review_id: reviewId } : r))
       );
       setEditingNote(null);
       toast({ title: 'Saved', description: 'Resolution note updated.' });
