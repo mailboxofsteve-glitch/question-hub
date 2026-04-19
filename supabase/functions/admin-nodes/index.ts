@@ -129,6 +129,8 @@ Deno.serve(async (req) => {
           category: body.category ?? null,
           keywords: body.keywords ?? null,
           layer1: body.layer1 ?? null,
+          layer1_bold: body.layer1_bold ?? null,
+          trigger_word: body.trigger_word ?? null,
           layer2_json: body.layer2_json ?? {},
           layer3_json: body.layer3_json ?? {},
           tier: body.tier ?? null,
@@ -152,6 +154,8 @@ Deno.serve(async (req) => {
         if ("category" in body) updateData.category = body.category;
         if ("keywords" in body) updateData.keywords = body.keywords;
         if ("layer1" in body) updateData.layer1 = body.layer1;
+        if ("layer1_bold" in body) updateData.layer1_bold = body.layer1_bold;
+        if ("trigger_word" in body) updateData.trigger_word = body.trigger_word;
         if ("layer2_json" in body) updateData.layer2_json = body.layer2_json;
         if ("layer3_json" in body) updateData.layer3_json = body.layer3_json;
         if ("tier" in body) updateData.tier = body.tier;
