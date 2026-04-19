@@ -27,6 +27,9 @@ const TIER_COLORS: Record<number, string> = {
   4: "hsl(0, 60%, 55%)",
   5: "hsl(320, 55%, 50%)",
   6: "hsl(45, 80%, 48%)",
+  7: "hsl(190, 60%, 45%)",
+  8: "hsl(260, 45%, 58%)",
+  9: "hsl(15, 75%, 52%)",
 };
 
 const TIER_BG_COLORS: Record<number, string> = {
@@ -37,6 +40,9 @@ const TIER_BG_COLORS: Record<number, string> = {
   4: "hsla(0, 60%, 55%, 0.08)",
   5: "hsla(320, 55%, 50%, 0.08)",
   6: "hsla(45, 80%, 48%, 0.08)",
+  7: "hsla(190, 60%, 45%, 0.08)",
+  8: "hsla(260, 45%, 58%, 0.08)",
+  9: "hsla(15, 75%, 52%, 0.08)",
 };
 
 const TIER_LABELS: Record<number, string> = {
@@ -47,6 +53,9 @@ const TIER_LABELS: Record<number, string> = {
   4: "Human Nature",
   5: "The Revelation Bridge",
   6: "Testing the Bible",
+  7: "The Document Case",
+  8: "The Christological Case",
+  9: "Response Threshold",
 };
 
 const BAND_HEIGHT_MIN = 180;
@@ -55,7 +64,7 @@ const NODE_VERTICAL_SPACING = 70;
 const ZIGZAG_OFFSET = 30;
 const PADDING_TOP = 40;
 const PADDING_BOTTOM = 40;
-const TIER_COUNT = 7;
+const TIER_COUNT = 10;
 
 // ── Printable View Component ──────────────────────────────────────
 function PrintView({
@@ -69,7 +78,7 @@ function PrintView({
 }) {
   return (
     <div className="print-view space-y-6">
-      {Array.from({ length: 7 }, (_, i) => 6 - i).map((tier) => {
+      {Array.from({ length: 10 }, (_, i) => 9 - i).map((tier) => {
         const gates = gatesByTier.get(tier) ?? [];
         if (gates.length === 0) return null;
         return (
@@ -170,9 +179,13 @@ export default function SpineMap() {
 
     const gateToTier = new globalThis.Map<string, number>();
     gateTierVotes.forEach((votes, gate) => {
-      let maxTier = 0, maxCount = 0;
+      let maxTier = 0,
+        maxCount = 0;
       votes.forEach((count, tier) => {
-        if (count > maxCount) { maxCount = count; maxTier = tier; }
+        if (count > maxCount) {
+          maxCount = count;
+          maxTier = tier;
+        }
       });
       gateToTier.set(gate, maxTier);
     });
@@ -307,13 +320,16 @@ export default function SpineMap() {
       return Math.max(BAND_HEIGHT_MIN, count * NODE_VERTICAL_SPACING + 60);
     };
 
-    const totalHeight = PADDING_TOP + Array.from({ length: TIER_COUNT }, (_, i) => bandHeight(i)).reduce((a, b) => a + b, 0) + PADDING_BOTTOM;
+    const totalHeight =
+      PADDING_TOP +
+      Array.from({ length: TIER_COUNT }, (_, i) => bandHeight(i)).reduce((a, b) => a + b, 0) +
+      PADDING_BOTTOM;
 
     const tierBandY = (tier: number) => {
-      const invertedIndex = (TIER_COUNT - 1) - tier;
+      const invertedIndex = TIER_COUNT - 1 - tier;
       let y = PADDING_TOP;
       for (let i = 0; i < invertedIndex; i++) {
-        const t = (TIER_COUNT - 1) - i;
+        const t = TIER_COUNT - 1 - i;
         y += bandHeight(t);
       }
       return y;
@@ -328,8 +344,15 @@ export default function SpineMap() {
 
     // ── 2. Position spine nodes with zigzag offset ──
     type PosNode = {
-      id: string; label: string; x: number; y: number;
-      tier: number; isSpine: boolean; radius: number; color: string; navigateId: string;
+      id: string;
+      label: string;
+      x: number;
+      y: number;
+      tier: number;
+      isSpine: boolean;
+      radius: number;
+      color: string;
+      navigateId: string;
     };
     const posNodes: PosNode[] = [];
     const spineX = contentWidth / 2;
@@ -351,13 +374,19 @@ export default function SpineMap() {
       const bandTop = tierBandY(tier) + 30;
       const bandBottom = tierBandY(tier) + bh - 30;
       tierNodes.forEach((node, i) => {
-        const y = tierNodes.length === 1
-          ? (bandTop + bandBottom) / 2
-          : bandBottom - (bandBottom - bandTop) * (i / (tierNodes.length - 1));
+        const y =
+          tierNodes.length === 1
+            ? (bandTop + bandBottom) / 2
+            : bandBottom - (bandBottom - bandTop) * (i / (tierNodes.length - 1));
         const xOffset = (globalSpineIdx % 2 === 0 ? -1 : 1) * ZIGZAG_OFFSET;
         posNodes.push({
-          id: node.id, label: node.title, x: spineX + xOffset, y,
-          tier, isSpine: true, radius: 28,
+          id: node.id,
+          label: node.title,
+          x: spineX + xOffset,
+          y,
+          tier,
+          isSpine: true,
+          radius: 28,
           color: TIER_COLORS[tier] ?? "hsl(0, 0%, 50%)",
           navigateId: node.id,
         });
@@ -422,11 +451,16 @@ export default function SpineMap() {
         const y = bandTop + (bandBottom - bandTop) * ySlot;
 
         const branch: BranchNode = {
-          id: b.id, label: b.title,
-          x: parentPos.x + xOffset, y,
-          tier: bTier, isSpine: false, radius: 13,
+          id: b.id,
+          label: b.title,
+          x: parentPos.x + xOffset,
+          y,
+          tier: bTier,
+          isSpine: false,
+          radius: 13,
           color: TIER_COLORS[bTier] ?? "hsl(0, 0%, 50%)",
-          navigateId: b.id, parents,
+          navigateId: b.id,
+          parents,
         };
         branchNodes.push(branch);
         posNodes.push(branch);
@@ -445,7 +479,8 @@ export default function SpineMap() {
 
     const g = svg.append("g");
 
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
+    const zoom = d3
+      .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.3, 3])
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
@@ -454,7 +489,8 @@ export default function SpineMap() {
     svg.call(zoom);
 
     // Restore saved zoom transform so clicking a node doesn't reset the view
-    const isRestoringZoom = zoomTransformRef.current.k !== 1 || zoomTransformRef.current.x !== 0 || zoomTransformRef.current.y !== 0;
+    const isRestoringZoom =
+      zoomTransformRef.current.k !== 1 || zoomTransformRef.current.x !== 0 || zoomTransformRef.current.y !== 0;
     if (isRestoringZoom) {
       svg.call(zoom.transform, zoomTransformRef.current);
     }
@@ -479,34 +515,50 @@ export default function SpineMap() {
       const collapsed = collapsedTiers.has(tier);
 
       g.append("rect")
-        .attr("x", 0).attr("y", bandY)
-        .attr("width", contentWidth).attr("height", bh)
+        .attr("x", 0)
+        .attr("y", bandY)
+        .attr("width", contentWidth)
+        .attr("height", bh)
         .attr("fill", TIER_BG_COLORS[tier] ?? "transparent")
         .attr("stroke", TIER_COLORS[tier] ?? "transparent")
-        .attr("stroke-opacity", 0.2).attr("stroke-width", 1);
+        .attr("stroke-opacity", 0.2)
+        .attr("stroke-width", 1);
 
       // Clickable tier label area
-      const labelGroup = g.append("g")
+      const labelGroup = g
+        .append("g")
         .attr("cursor", "pointer")
         .on("click", () => toggleTier(tier));
 
       // Chevron icon (▶ collapsed, ▼ expanded)
-      labelGroup.append("text")
-        .attr("x", 8).attr("y", bandY + (collapsed ? bh / 2 : bh / 2))
-        .attr("dy", "0.35em").attr("font-size", 12)
-        .attr("fill", TIER_COLORS[tier] ?? "currentColor").attr("opacity", 0.7)
+      labelGroup
+        .append("text")
+        .attr("x", 8)
+        .attr("y", bandY + (collapsed ? bh / 2 : bh / 2))
+        .attr("dy", "0.35em")
+        .attr("font-size", 12)
+        .attr("fill", TIER_COLORS[tier] ?? "currentColor")
+        .attr("opacity", 0.7)
         .text(collapsed ? "▶" : "▼");
 
-      labelGroup.append("text")
-        .attr("x", 24).attr("y", bandY + (collapsed ? bh / 2 : bh / 2))
-        .attr("dy", "0.35em").attr("font-size", 18).attr("font-weight", 800)
-        .attr("fill", TIER_COLORS[tier] ?? "currentColor").attr("opacity", 0.85)
+      labelGroup
+        .append("text")
+        .attr("x", 24)
+        .attr("y", bandY + (collapsed ? bh / 2 : bh / 2))
+        .attr("dy", "0.35em")
+        .attr("font-size", 18)
+        .attr("font-weight", 800)
+        .attr("fill", TIER_COLORS[tier] ?? "currentColor")
+        .attr("opacity", 0.85)
         .text(`T${tier}: ${TIER_LABELS[tier] ?? ""}`);
 
       // Invisible hit area for easier clicking
-      labelGroup.append("rect")
-        .attr("x", 0).attr("y", bandY)
-        .attr("width", 340).attr("height", bh)
+      labelGroup
+        .append("rect")
+        .attr("x", 0)
+        .attr("y", bandY)
+        .attr("width", 340)
+        .attr("height", bh)
         .attr("fill", "transparent");
     }
 
@@ -517,8 +569,10 @@ export default function SpineMap() {
       const bothMatch = isMatch(a.id) && isMatch(b.id);
       const bothGold = isGoldHighlight(a.id) && isGoldHighlight(b.id);
       g.append("line")
-        .attr("x1", a.x).attr("y1", a.y)
-        .attr("x2", b.x).attr("y2", b.y)
+        .attr("x1", a.x)
+        .attr("y1", a.y)
+        .attr("x2", b.x)
+        .attr("y2", b.y)
         .attr("stroke", bothGold ? "hsl(45, 100%, 60%)" : "hsl(var(--foreground))")
         .attr("stroke-width", bothGold ? 3 : 2)
         .attr("stroke-opacity", bothMatch ? (bothGold ? 0.7 : 0.25) : dimOpacity);
@@ -530,8 +584,10 @@ export default function SpineMap() {
       const bnGold = isGoldHighlight(bn.id);
       bn.parents.forEach((parent) => {
         g.append("line")
-          .attr("x1", parent.x).attr("y1", parent.y)
-          .attr("x2", bn.x).attr("y2", bn.y)
+          .attr("x1", parent.x)
+          .attr("y1", parent.y)
+          .attr("x2", bn.x)
+          .attr("y2", bn.y)
           .attr("stroke", bnGold ? "hsl(45, 100%, 60%)" : bn.color)
           .attr("stroke-width", bnGold ? 2.5 : 1.2)
           .attr("stroke-opacity", bnMatch ? (bnGold ? 0.7 : 0.35) : dimOpacity)
@@ -540,17 +596,24 @@ export default function SpineMap() {
     });
 
     // ── Branch node circles (with animation) ──
-    const branchCircles = g.append("g")
+    const branchCircles = g
+      .append("g")
       .selectAll<SVGCircleElement, BranchNode>("circle")
-      .data(branchNodes).join("circle")
-      .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", 0)
+      .data(branchNodes)
+      .join("circle")
+      .attr("cx", (d) => d.x)
+      .attr("cy", (d) => d.y)
+      .attr("r", 0)
       .attr("fill", (d) => d.color)
-      .attr("fill-opacity", (d) => isMatch(d.id) ? 0.85 : dimOpacity)
-      .attr("stroke", (d) => isGoldHighlight(d.id) ? "hsl(45, 100%, 60%)" : "hsl(var(--foreground))")
-      .attr("stroke-width", (d) => isGoldHighlight(d.id) ? 2.5 : 1.2)
+      .attr("fill-opacity", (d) => (isMatch(d.id) ? 0.85 : dimOpacity))
+      .attr("stroke", (d) => (isGoldHighlight(d.id) ? "hsl(45, 100%, 60%)" : "hsl(var(--foreground))"))
+      .attr("stroke-width", (d) => (isGoldHighlight(d.id) ? 2.5 : 1.2))
       .attr("cursor", "pointer")
       .on("mouseover", function (event, d) {
-        d3.select(this).transition().duration(150).attr("r", d.radius * 1.4);
+        d3.select(this)
+          .transition()
+          .duration(150)
+          .attr("r", d.radius * 1.4);
         setTooltip({ x: event.offsetX, y: event.offsetY, text: d.label });
       })
       .on("mouseout", function (_event, d) {
@@ -569,44 +632,59 @@ export default function SpineMap() {
     if (isRestoringZoom) {
       branchCircles.attr("r", (d) => d.radius);
     } else {
-      branchCircles.transition()
+      branchCircles
+        .transition()
         .duration(400)
         .delay((_d, i) => 300 + i * 8)
         .attr("r", (d) => d.radius);
     }
 
     // ── Branch node labels ──
-    const branchLabels = g.append("g")
+    const branchLabels = g
+      .append("g")
       .selectAll("text")
-      .data(branchNodes).join("text")
-      .text((d) => d.label.length > 18 ? d.label.slice(0, 16) + "…" : d.label)
-      .attr("x", (d) => d.x).attr("y", (d) => d.y - 18)
-      .attr("font-size", 9).attr("font-weight", 500)
+      .data(branchNodes)
+      .join("text")
+      .text((d) => (d.label.length > 18 ? d.label.slice(0, 16) + "…" : d.label))
+      .attr("x", (d) => d.x)
+      .attr("y", (d) => d.y - 18)
+      .attr("font-size", 9)
+      .attr("font-weight", 500)
       .attr("fill", "hsl(var(--foreground))")
-      .attr("fill-opacity", (d) => isMatch(d.id) ? 0.7 : dimOpacity)
+      .attr("fill-opacity", (d) => (isMatch(d.id) ? 0.7 : dimOpacity))
       .attr("text-anchor", "middle")
       .attr("pointer-events", "none");
 
     if (isRestoringZoom) {
       branchLabels.attr("opacity", 1);
     } else {
-      branchLabels.attr("opacity", 0)
-        .transition().duration(400).delay((_d, i) => 300 + i * 8)
+      branchLabels
+        .attr("opacity", 0)
+        .transition()
+        .duration(400)
+        .delay((_d, i) => 300 + i * 8)
         .attr("opacity", 1);
     }
 
     // ── Spine node circles (with staggered animation) ──
-    const spineCircles = g.append("g")
+    const spineCircles = g
+      .append("g")
       .selectAll<SVGCircleElement, PosNode>("circle")
-      .data(spinePositioned).join("circle")
-      .attr("cx", (d) => d.x).attr("cy", (d) => d.y).attr("r", 0)
+      .data(spinePositioned)
+      .join("circle")
+      .attr("cx", (d) => d.x)
+      .attr("cy", (d) => d.y)
+      .attr("r", 0)
       .attr("fill", (d) => d.color)
-      .attr("fill-opacity", (d) => isMatch(d.id) ? 1 : dimOpacity)
-      .attr("stroke", (d) => isGoldHighlight(d.id) ? "hsl(45, 100%, 60%)" : "hsl(var(--foreground))")
-      .attr("stroke-width", (d) => isGoldHighlight(d.id) ? 3 : 2)
+      .attr("fill-opacity", (d) => (isMatch(d.id) ? 1 : dimOpacity))
+      .attr("stroke", (d) => (isGoldHighlight(d.id) ? "hsl(45, 100%, 60%)" : "hsl(var(--foreground))"))
+      .attr("stroke-width", (d) => (isGoldHighlight(d.id) ? 3 : 2))
       .attr("cursor", "pointer")
       .on("mouseover", function (event, d) {
-        d3.select(this).transition().duration(150).attr("r", d.radius * 1.3);
+        d3.select(this)
+          .transition()
+          .duration(150)
+          .attr("r", d.radius * 1.3);
         setTooltip({ x: event.offsetX, y: event.offsetY, text: d.label });
       })
       .on("mouseout", function (_event, d) {
@@ -625,12 +703,12 @@ export default function SpineMap() {
     if (isRestoringZoom) {
       spineCircles.attr("r", (d) => d.radius);
     } else {
-      spineCircles.transition()
+      spineCircles
+        .transition()
         .duration(500)
         .delay((_d, i) => i * 40)
         .attr("r", (d) => d.radius);
     }
-
 
     // ── Node count badges ──
     const badgeData = spinePositioned
@@ -640,20 +718,24 @@ export default function SpineMap() {
       })
       .filter((d) => d.count > 0);
 
-    const badgeG = g.append("g")
-      .selectAll<SVGGElement, typeof badgeData[0]>("g")
-      .data(badgeData).join("g")
+    const badgeG = g
+      .append("g")
+      .selectAll<SVGGElement, (typeof badgeData)[0]>("g")
+      .data(badgeData)
+      .join("g")
       .attr("transform", (d) => `translate(${d.x + d.radius * 0.7}, ${d.y - d.radius * 0.7})`)
       .attr("pointer-events", "none")
       .attr("opacity", 0);
 
-    badgeG.append("circle")
+    badgeG
+      .append("circle")
       .attr("r", 10)
       .attr("fill", (d) => d.color)
       .attr("stroke", "hsl(var(--background))")
       .attr("stroke-width", 2);
 
-    badgeG.append("text")
+    badgeG
+      .append("text")
       .text((d) => d.count.toString())
       .attr("text-anchor", "middle")
       .attr("dy", "0.35em")
@@ -664,18 +746,28 @@ export default function SpineMap() {
     if (isRestoringZoom) {
       badgeG.attr("opacity", 1);
     } else {
-      badgeG.transition().duration(400).delay((_d, i) => 600 + i * 40).attr("opacity", 1);
+      badgeG
+        .transition()
+        .duration(400)
+        .delay((_d, i) => 600 + i * 40)
+        .attr("opacity", 1);
     }
-
-  }, [nodes, showPrintView, collapsedTiers, matchingIds, toggleTier, branchCountBySpine, ancestorPathIds, selectedNodeId]);
+  }, [
+    nodes,
+    showPrintView,
+    collapsedTiers,
+    matchingIds,
+    toggleTier,
+    branchCountBySpine,
+    ancestorPathIds,
+    selectedNodeId,
+  ]);
 
   return (
     <AppLayout>
       <div className="px-4 py-6 max-w-[1600px] mx-auto print:px-2 print:py-2">
         <div className="flex items-center justify-between mb-2 print:hidden gap-3">
-          <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground shrink-0">
-            Vertebrae of Truth
-          </h1>
+          <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground shrink-0">Vertebrae of Truth</h1>
           <div className="flex items-center gap-2">
             {!showPrintView && (
               <div className="relative w-48">
@@ -696,7 +788,15 @@ export default function SpineMap() {
                 else setShowPrintView(true);
               }}
             >
-              {showPrintView ? <><Map className="w-4 h-4 mr-1.5" /> Map View</> : <><Printer className="w-4 h-4 mr-1.5" /> Print View</>}
+              {showPrintView ? (
+                <>
+                  <Map className="w-4 h-4 mr-1.5" /> Map View
+                </>
+              ) : (
+                <>
+                  <Printer className="w-4 h-4 mr-1.5" /> Print View
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -706,8 +806,8 @@ export default function SpineMap() {
           {selectedNodeId
             ? "Path highlighted — click the selected node again to open it. Press Esc to clear."
             : showPrintView
-            ? "Printable listing of all nodes grouped by tier and spine gate."
-            : "Vertical tier layout — click a tier label to collapse/expand. Click a node to highlight its path."}
+              ? "Printable listing of all nodes grouped by tier and spine gate."
+              : "Vertical tier layout — click a tier label to collapse/expand. Click a node to highlight its path."}
         </p>
 
         {/* Legend — hide in print */}
@@ -715,8 +815,13 @@ export default function SpineMap() {
           <div className="flex flex-wrap gap-3 mb-4 print:hidden">
             {Object.entries(TIER_LABELS).map(([tier, label]) => (
               <div key={tier} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: TIER_COLORS[Number(tier)] }} />
-                <span>T{tier}: {label}</span>
+                <span
+                  className="inline-block w-3 h-3 rounded-full"
+                  style={{ backgroundColor: TIER_COLORS[Number(tier)] }}
+                />
+                <span>
+                  T{tier}: {label}
+                </span>
               </div>
             ))}
           </div>
@@ -734,7 +839,10 @@ export default function SpineMap() {
             <PrintView nodes={nodes ?? []} gatesByTier={gatesByTier} branchesByGate={branchesByGate} />
           </div>
         ) : (
-          <div ref={containerRef} className="relative w-full border border-border rounded-lg bg-card overflow-hidden print:hidden">
+          <div
+            ref={containerRef}
+            className="relative w-full border border-border rounded-lg bg-card overflow-hidden print:hidden"
+          >
             <svg ref={svgRef} className="w-full" style={{ height: "calc(100vh - 240px)", minHeight: 600 }} />
             {tooltip && (
               <div
@@ -749,15 +857,17 @@ export default function SpineMap() {
       </div>
 
       {/* Node detail overlay */}
-      <Dialog open={!!overlayNodeId} onOpenChange={(open) => { if (!open) setOverlayNodeId(null); }}>
+      <Dialog
+        open={!!overlayNodeId}
+        onOpenChange={(open) => {
+          if (!open) setOverlayNodeId(null);
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[85vh] p-0 gap-0 overflow-hidden">
           <DialogTitle className="sr-only">Node Detail</DialogTitle>
           <ScrollArea className="max-h-[85vh] p-6">
             {overlayNodeId && (
-              <NodeDetailContent
-                id={overlayNodeId}
-                onNavigateNode={(nodeId) => setOverlayNodeId(nodeId)}
-              />
+              <NodeDetailContent id={overlayNodeId} onNavigateNode={(nodeId) => setOverlayNodeId(nodeId)} />
             )}
           </ScrollArea>
         </DialogContent>
