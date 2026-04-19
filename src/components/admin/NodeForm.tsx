@@ -42,7 +42,9 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
   const [altPhrasings, setAltPhrasings] = useState<string[]>(parseAltPhrasings(node?.alt_phrasings));
   const [category, setCategory] = useState(node?.category ?? "");
   const [keywords, setKeywords] = useState(node?.keywords ?? "");
+  const [layer1Bold, setLayer1Bold] = useState(node?.layer1_bold ?? "");
   const [layer1, setLayer1] = useState(node?.layer1 ?? "");
+  const [triggerWord, setTriggerWord] = useState(node?.trigger_word ?? "");
   const [layer2Bullets, setLayer2Bullets] = useState<ReasoningBullet[]>(deserializeLayer2(node?.layer2_json));
   const [layer3Data, setLayer3Data] = useState<Layer3Data>(deserializeLayer3(node?.layer3_json));
   const [tier, setTier] = useState<number | null>((node as any)?.tier ?? null);
@@ -70,7 +72,9 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
       alt_phrasings: altPhrasings.filter((p) => p.trim()) as unknown as Node["alt_phrasings"],
       category: category.trim() || null,
       keywords: keywords.trim() || null,
+      layer1_bold: layer1Bold.trim() || null,
       layer1: layer1.trim() || null,
+      trigger_word: triggerWord.trim() || null,
       layer2_json: serializeLayer2(layer2Bullets) as unknown as Node["layer2_json"],
       layer3_json: serializeLayer3(layer3Data) as unknown as Node["layer3_json"],
       tier,
@@ -154,7 +158,7 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
               <Input
@@ -172,6 +176,18 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
                 onChange={(e) => setKeywords(e.target.value)}
                 placeholder="e.g. force, Newton, mass"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="trigger-word">Trigger Word</Label>
+              <Input
+                id="trigger-word"
+                value={triggerWord}
+                onChange={(e) => setTriggerWord(e.target.value)}
+                placeholder="e.g. truth"
+              />
+              <p className="text-xs text-muted-foreground">
+                One word. Displays bold and highlighted wherever it appears across all three layers.
+              </p>
             </div>
           </div>
 
@@ -207,6 +223,20 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
               />
               <p className="text-xs text-muted-foreground">Comma-separated gate IDs</p>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="layer1-bold">Layer 1 — Bold Statement</Label>
+            <Textarea
+              id="layer1-bold"
+              value={layer1Bold}
+              onChange={(e) => setLayer1Bold(e.target.value)}
+              placeholder="One punchy sentence that answers the question directly."
+              rows={2}
+            />
+            <p className="text-xs text-muted-foreground">
+              Displays in bold before the summary. Aim for something that provokes curiosity or a reaction.
+            </p>
           </div>
 
           <div className="space-y-2">
