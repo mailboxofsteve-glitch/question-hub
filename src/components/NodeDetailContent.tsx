@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, BookOpen, Lightbulb, ExternalLink, Share2 } from 'lucide-react';
 import MarkdownText from '@/components/MarkdownText';
+import { highlightTriggerWord } from '@/lib/highlight-trigger';
 import { supabase } from '@/integrations/supabase/client';
 import { trackEvent } from '@/lib/analytics';
 import { useRecentlyViewed } from '@/hooks/use-recently-viewed';
@@ -223,7 +224,7 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
       {/* Title + Share */}
       <div className="flex items-start justify-between gap-3 mb-6">
         <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground leading-tight">
-          {node.title}
+          {highlightTriggerWord(node.title, (node as any).trigger_word as string | null)}
         </h2>
         <Button variant="ghost" size="icon" onClick={handleCopyLink} aria-label="Copy link to clipboard" className="shrink-0 mt-1">
           <Share2 className="w-4 h-4" />
@@ -234,7 +235,20 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
       {/* ── Layer 1: Always-visible answer ── */}
       <section className="mb-8">
         <div className="surface-elevated rounded-xl border border-border p-5">
-          <MarkdownText content={node.layer1 ?? ''} className="font-body text-base text-foreground leading-relaxed" />
+          <p className="font-body text-base text-foreground leading-relaxed">
+            {(node as any).layer1_bold && (
+              <>
+                <strong style={{ fontWeight: 700 }}>
+                  {highlightTriggerWord((node as any).layer1_bold as string, (node as any).trigger_word as string | null)}
+                </strong>
+                {' '}
+              </>
+            )}
+            <MarkdownText
+              content={node.layer1 ?? ''}
+              triggerWord={(node as any).trigger_word as string | null}
+            />
+          </p>
         </div>
       </section>
 
@@ -268,14 +282,14 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
                     <AccordionTrigger className="py-4 hover:no-underline gap-3">
                       <div className="text-left flex-1 min-w-0">
                         <h4 className="font-display text-sm font-semibold text-foreground leading-snug">
-                          {bullet.title}
+                          {highlightTriggerWord(bullet.title, (node as any).trigger_word as string | null)}
                         </h4>
-                        <MarkdownText content={bullet.summary} className="mt-1 text-sm text-muted-foreground font-body" />
+                        <MarkdownText content={bullet.summary} triggerWord={(node as any).trigger_word as string | null} className="mt-1 text-sm text-muted-foreground font-body" />
                       </div>
                     </AccordionTrigger>
                     <AccordionContent className="pb-5">
                       <div className="border-t border-border pt-4">
-                        <MarkdownText content={bullet.detail} className="text-sm text-foreground font-body leading-relaxed whitespace-pre-line" />
+                        <MarkdownText content={bullet.detail} triggerWord={(node as any).trigger_word as string | null} className="text-sm text-foreground font-body leading-relaxed whitespace-pre-line" />
                         {bullet.image_url && (
                           <img src={bullet.image_url} alt={bullet.title} className="mt-3 rounded-md w-full object-contain max-h-96" />
                         )}
@@ -319,8 +333,8 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
                   <a key={i} href={res.url ?? '#'} target="_blank" rel="noopener noreferrer" className="flex items-start gap-3 surface-elevated rounded-lg border border-border p-4 hover:border-accent/40 hover:glow-amber transition-all duration-200 group">
                     <ExternalLink className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0 group-hover:text-accent transition-colors" />
                     <div className="flex-1 min-w-0">
-                      <MarkdownText content={res.title} className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display" />
-                      {res.description && <MarkdownText content={res.description} className="text-xs text-muted-foreground mt-0.5 font-body" />}
+                      <MarkdownText content={res.title} triggerWord={(node as any).trigger_word as string | null} className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display" />
+                      {res.description && <MarkdownText content={res.description} triggerWord={(node as any).trigger_word as string | null} className="text-xs text-muted-foreground mt-0.5 font-body" />}
                     </div>
                   </a>
                 ))}
@@ -380,8 +394,8 @@ const NodeDetailContent = ({ id, onNavigateNode, diagnosticMode, onDiagnosticRea
                   <a key={i} href={src.url ?? '#'} target="_blank" rel="noopener noreferrer" className="flex items-start gap-3 surface-elevated rounded-lg border border-border p-4 hover:border-accent/40 hover:glow-amber transition-all duration-200 group">
                     <ExternalLink className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0 group-hover:text-accent transition-colors" />
                     <div className="flex-1 min-w-0">
-                      <MarkdownText content={src.title} className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display" />
-                      {src.description && <MarkdownText content={src.description} className="text-xs text-muted-foreground mt-0.5 font-body" />}
+                      <MarkdownText content={src.title} triggerWord={(node as any).trigger_word as string | null} className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display" />
+                      {src.description && <MarkdownText content={src.description} triggerWord={(node as any).trigger_word as string | null} className="text-xs text-muted-foreground mt-0.5 font-body" />}
                     </div>
                   </a>
                 ))}
