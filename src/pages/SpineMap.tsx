@@ -50,12 +50,12 @@ const TIER_LABELS: Record<number, string> = {
   1: "The Existence Question",
   2: "Design & Information",
   3: "Moral Reality",
-  4: "Human Nature",
+  4: "The Human Signal",
   5: "The Revelation Bridge",
-  6: "Testing the Bible",
-  7: "The Document Case",
-  8: "The Christological Case",
-  9: "Response Threshold",
+  6: "The Document Case",
+  7: "The Christological Case",
+  8: "Doctrine & Teaching",
+  9: "The Response Threshold",
 };
 
 const BAND_HEIGHT_MIN = 180;
