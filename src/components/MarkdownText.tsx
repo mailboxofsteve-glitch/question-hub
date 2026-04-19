@@ -1,11 +1,13 @@
 import ReactMarkdown from 'react-markdown';
+import { highlightTriggerWord } from '@/lib/highlight-trigger';
 
 interface MarkdownTextProps {
   content: string;
   className?: string;
+  triggerWord?: string | null;
 }
 
-const MarkdownText = ({ content, className }: MarkdownTextProps) => {
+const MarkdownText = ({ content, className, triggerWord }: MarkdownTextProps) => {
   if (!content) return null;
 
   return (
@@ -23,7 +25,14 @@ const MarkdownText = ({ content, className }: MarkdownTextProps) => {
           ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>,
           ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>,
           li: ({ children }) => <li>{children}</li>,
-        }}
+          // Override default text node renderer so trigger-word highlighting
+          // applies inside markdown text runs while preserving bold/links/lists.
+          text: ({ children }) => {
+            const value = typeof children === 'string' ? children : String(children ?? '');
+            if (!triggerWord) return <>{value}</>;
+            return <>{highlightTriggerWord(value, triggerWord)}</>;
+          },
+        } as any}
       >
         {content}
       </ReactMarkdown>

@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ChevronRight, BookOpen, Lightbulb, ExternalLink } from 'lucide-react';
 import MarkdownText from '@/components/MarkdownText';
+import { highlightTriggerWord } from '@/lib/highlight-trigger';
 import { supabase } from '@/integrations/supabase/client';
 import AppLayout from '@/components/layout/AppLayout';
 import {
@@ -158,13 +159,26 @@ const NodePreview = () => {
 
         {/* Title */}
         <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground leading-tight mb-6">
-          {node.title}
+          {highlightTriggerWord(node.title, (node as any).trigger_word as string | null)}
         </h1>
 
         {/* Layer 1 */}
         <section className="mb-10">
           <div className="surface-elevated rounded-xl border border-border p-6">
-            <MarkdownText content={node.layer1 ?? ''} className="font-body text-base text-foreground leading-relaxed" />
+            <p className="font-body text-base text-foreground leading-relaxed">
+              {(node as any).layer1_bold && (
+                <>
+                  <strong style={{ fontWeight: 700 }}>
+                    {highlightTriggerWord((node as any).layer1_bold as string, (node as any).trigger_word as string | null)}
+                  </strong>
+                  {' '}
+                </>
+              )}
+              <MarkdownText
+                content={node.layer1 ?? ''}
+                triggerWord={(node as any).trigger_word as string | null}
+              />
+            </p>
           </div>
         </section>
 
@@ -193,14 +207,14 @@ const NodePreview = () => {
                       <AccordionTrigger className="py-4 hover:no-underline gap-3">
                         <div className="text-left flex-1 min-w-0">
                           <h3 className="font-display text-sm font-semibold text-foreground leading-snug">
-                            {bullet.title}
+                            {highlightTriggerWord(bullet.title, (node as any).trigger_word as string | null)}
                           </h3>
-                          <MarkdownText content={bullet.summary} className="mt-1 text-sm text-muted-foreground font-body" />
+                          <MarkdownText content={bullet.summary} triggerWord={(node as any).trigger_word as string | null} className="mt-1 text-sm text-muted-foreground font-body" />
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="pb-5">
                         <div className="border-t border-border pt-4">
-                          <MarkdownText content={bullet.detail} className="text-sm text-foreground font-body leading-relaxed whitespace-pre-line" />
+                          <MarkdownText content={bullet.detail} triggerWord={(node as any).trigger_word as string | null} className="text-sm text-foreground font-body leading-relaxed whitespace-pre-line" />
                           {bullet.image_url && (
                             <img
                               src={bullet.image_url}
@@ -259,9 +273,9 @@ const NodePreview = () => {
                     >
                       <ExternalLink className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0 group-hover:text-accent transition-colors" />
                       <div className="flex-1 min-w-0">
-                        <MarkdownText content={res.title} className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display" />
+                        <MarkdownText content={res.title} triggerWord={(node as any).trigger_word as string | null} className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display" />
                         {res.description && (
-                          <MarkdownText content={res.description} className="text-xs text-muted-foreground mt-0.5 font-body" />
+                          <MarkdownText content={res.description} triggerWord={(node as any).trigger_word as string | null} className="text-xs text-muted-foreground mt-0.5 font-body" />
                         )}
                       </div>
                     </a>
@@ -327,9 +341,9 @@ const NodePreview = () => {
                     >
                       <ExternalLink className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0 group-hover:text-accent transition-colors" />
                       <div className="flex-1 min-w-0">
-                        <MarkdownText content={src.title} className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display" />
+                        <MarkdownText content={src.title} triggerWord={(node as any).trigger_word as string | null} className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors font-display" />
                         {src.description && (
-                          <MarkdownText content={src.description} className="text-xs text-muted-foreground mt-0.5 font-body" />
+                          <MarkdownText content={src.description} triggerWord={(node as any).trigger_word as string | null} className="text-xs text-muted-foreground mt-0.5 font-body" />
                         )}
                       </div>
                     </a>
