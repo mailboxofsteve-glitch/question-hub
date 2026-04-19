@@ -1,0 +1,2 @@
+ALTER TABLE public.nodes ADD COLUMN IF NOT EXISTS layer1_bold TEXT;
+ALTER TABLE public.nodes ADD COLUMN IF NOT EXISTS trigger_word TEXT;

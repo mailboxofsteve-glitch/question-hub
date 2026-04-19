@@ -120,6 +120,7 @@ export type Database = {
           id: string
           keywords: string | null
           layer1: string | null
+          layer1_bold: string | null
           layer2_json: Json | null
           layer3_json: Json | null
           published: boolean
@@ -127,6 +128,7 @@ export type Database = {
           spine_gates: Json
           tier: number | null
           title: string
+          trigger_word: string | null
           updated_at: string
         }
         Insert: {
@@ -136,6 +138,7 @@ export type Database = {
           id: string
           keywords?: string | null
           layer1?: string | null
+          layer1_bold?: string | null
           layer2_json?: Json | null
           layer3_json?: Json | null
           published?: boolean
@@ -143,6 +146,7 @@ export type Database = {
           spine_gates?: Json
           tier?: number | null
           title: string
+          trigger_word?: string | null
           updated_at?: string
         }
         Update: {
@@ -152,6 +156,7 @@ export type Database = {
           id?: string
           keywords?: string | null
           layer1?: string | null
+          layer1_bold?: string | null
           layer2_json?: Json | null
           layer3_json?: Json | null
           published?: boolean
@@ -159,6 +164,7 @@ export type Database = {
           spine_gates?: Json
           tier?: number | null
           title?: string
+          trigger_word?: string | null
           updated_at?: string
         }
         Relationships: []
