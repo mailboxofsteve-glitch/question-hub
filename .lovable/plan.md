@@ -1,39 +1,44 @@
 
-The user wants two new form fields wired to the `trigger_word` and `layer1_bold` columns already added to `nodes`. Straightforward NodeForm-only edit.
+Straightforward update to two render components. The tricky bit: `MarkdownText` runs ReactMarkdown on the raw string, so highlighting trigger words inside markdown content requires a different approach than for plain strings (titles are plain, but summaries/details/descriptions go through MarkdownText).
 
-## Plan
+## Approach
 
-### 1. Update `src/components/admin/NodeForm.tsx`
-
-**State** — add two `useState` hooks near the existing ones:
-- `triggerWord` initialized from `node?.trigger_word ?? ""`
-- `layer1Bold` initialized from `node?.layer1_bold ?? ""`
-
-**UI — Trigger Word**
-Convert the existing 2-column grid (Category, Keywords) into a 3-column grid on `md+` so Trigger Word sits cleanly alongside them:
-- `grid-cols-1 md:grid-cols-3`
-- New `Input` with label "Trigger Word", placeholder `"e.g. truth"`
-- Helper text: "One word. Displays bold and highlighted wherever it appears across all three layers."
-
-**UI — Bold Statement**
-Insert a new `Textarea` block directly above the existing "Layer 1 — Summary" block:
-- Label: "Layer 1 — Bold Statement"
-- Placeholder: "One punchy sentence that answers the question directly."
-- `rows={2}`
-- Helper text: "Displays in bold before the summary. Aim for something that provokes curiosity or a reaction."
-
-**Submit payload** — extend the object passed to `onSubmit` with:
+### 1. New shared helper
+Create `src/lib/highlight-trigger.tsx` exporting:
 ```ts
-trigger_word: triggerWord.trim() || null,
-layer1_bold: layer1Bold.trim() || null,
+export function highlightTriggerWord(text: string, triggerWord: string | null): React.ReactNode
 ```
-(cast through the existing `as any` already used for `tier`/`spine_gates`.)
+- Returns `text` unchanged when `triggerWord` is null/empty/whitespace or no match
+- Escapes regex special chars in the trigger word
+- Splits with case-insensitive global regex (capturing group), maps matches to `<span style={{ fontWeight: 700, color: 'hsl(38, 92%, 50%)' }}>`
+- Returns array of strings + spans (suitable as React children)
 
-### 2. Out of scope
-- No changes to `Layer2Field`, `Layer3Field`, validation, Published toggle, download serializer, or any other component.
-- No DB or types changes (columns already exist; types regenerated).
+### 2. Plain-string fields (titles)
+Apply `highlightTriggerWord(...)` directly inside JSX where plain strings are rendered:
+- Reasoning bullet `<h4>{bullet.title}</h4>` → wrap children with helper
+
+### 3. Markdown fields
+For `MarkdownText` calls on `layer1`, `bullet.summary`, `bullet.detail`, `res.title`, `res.description`, `src.title`, `src.description`: extend `MarkdownText` with an optional `triggerWord?: string | null` prop. In its `components` map, override `text` renderer (react-markdown supports this) to run the highlight helper on each text node — preserving markdown (bold, links, lists) while still highlighting matches inside text runs.
+
+### 4. Layer 1 rendering
+Replace the current single `MarkdownText` Layer 1 block with a paragraph composed of:
+- If `layer1_bold` present: `<strong style={{ fontWeight: 700 }}>{highlightTriggerWord(layer1_bold, triggerWord)}</strong>` followed by a space
+- Then `<MarkdownText content={node.layer1 ?? ''} triggerWord={triggerWord} />` inline
+
+Wrap in a single `<p>` with the existing styling. (`MarkdownText` already returns inline content via `<span>` and unwraps `<p>`, so it composes cleanly inside one paragraph.)
+
+Note: `layer1_bold` is treated as plain text (per spec: "wrap in bold"), not markdown — keeps it simple.
+
+### 5. Apply to both files
+Same changes to `src/components/NodeDetailContent.tsx` and `src/pages/NodePreview.tsx`. Cast `triggerWord` and `layer1Bold` from `node` as `string | null`.
+
+### Out of scope
+Accordion behavior, related questions, analytics, diagnostic gating, NodeForm, schema, markdown parser internals beyond adding the optional trigger-word prop.
 
 ### Files changed
 | File | Change |
 |------|--------|
-| `src/components/admin/NodeForm.tsx` | Add `triggerWord` + `layer1Bold` state, two new fields in UI, include both in submit payload |
+| `src/lib/highlight-trigger.tsx` (new) | `highlightTriggerWord` helper |
+| `src/components/MarkdownText.tsx` | Accept optional `triggerWord` prop; highlight inside text nodes |
+| `src/components/NodeDetailContent.tsx` | Render `layer1_bold` + apply highlighting to layer1/2/3 text |
+| `src/pages/NodePreview.tsx` | Same rendering updates |
