@@ -1,19 +1,19 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tables } from '@/integrations/supabase/types';
-import { ArrowLeft, Download, Eye } from 'lucide-react';
-import AltPhrasingsField from './AltPhrasingsField';
-import WriterGuideDialog from './WriterGuideDialog';
-import { serializeNodeMarkdown } from '@/lib/serialize-node-markdown';
-import Layer2Field, { ReasoningBullet, serializeLayer2, deserializeLayer2 } from './Layer2Field';
-import Layer3Field, { Layer3Data, serializeLayer3, deserializeLayer3 } from './Layer3Field';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tables } from "@/integrations/supabase/types";
+import { ArrowLeft, Download, Eye } from "lucide-react";
+import AltPhrasingsField from "./AltPhrasingsField";
+import WriterGuideDialog from "./WriterGuideDialog";
+import { serializeNodeMarkdown } from "@/lib/serialize-node-markdown";
+import Layer2Field, { ReasoningBullet, serializeLayer2, deserializeLayer2 } from "./Layer2Field";
+import Layer3Field, { Layer3Data, serializeLayer3, deserializeLayer3 } from "./Layer3Field";
 
-type Node = Tables<'nodes'>;
+type Node = Tables<"nodes">;
 
 interface NodeFormProps {
   node?: Node | null;
@@ -25,7 +25,7 @@ interface NodeFormProps {
 
 function parseAltPhrasings(val: unknown): string[] {
   if (Array.isArray(val)) return val.map(String);
-  if (typeof val === 'string') {
+  if (typeof val === "string") {
     try {
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed)) return parsed.map(String);
@@ -37,32 +37,26 @@ function parseAltPhrasings(val: unknown): string[] {
 const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: NodeFormProps) => {
   const isEditing = !!node;
 
-  const [id, setId] = useState(node?.id ?? '');
-  const [title, setTitle] = useState(node?.title ?? '');
-  const [altPhrasings, setAltPhrasings] = useState<string[]>(
-    parseAltPhrasings(node?.alt_phrasings)
-  );
-  const [category, setCategory] = useState(node?.category ?? '');
-  const [keywords, setKeywords] = useState(node?.keywords ?? '');
-  const [layer1, setLayer1] = useState(node?.layer1 ?? '');
-  const [layer2Bullets, setLayer2Bullets] = useState<ReasoningBullet[]>(
-    deserializeLayer2(node?.layer2_json)
-  );
-  const [layer3Data, setLayer3Data] = useState<Layer3Data>(
-    deserializeLayer3(node?.layer3_json)
-  );
+  const [id, setId] = useState(node?.id ?? "");
+  const [title, setTitle] = useState(node?.title ?? "");
+  const [altPhrasings, setAltPhrasings] = useState<string[]>(parseAltPhrasings(node?.alt_phrasings));
+  const [category, setCategory] = useState(node?.category ?? "");
+  const [keywords, setKeywords] = useState(node?.keywords ?? "");
+  const [layer1, setLayer1] = useState(node?.layer1 ?? "");
+  const [layer2Bullets, setLayer2Bullets] = useState<ReasoningBullet[]>(deserializeLayer2(node?.layer2_json));
+  const [layer3Data, setLayer3Data] = useState<Layer3Data>(deserializeLayer3(node?.layer3_json));
   const [tier, setTier] = useState<number | null>((node as any)?.tier ?? null);
   const [spineGates, setSpineGates] = useState<string[]>(
-    Array.isArray((node as any)?.spine_gates) ? (node as any).spine_gates : []
+    Array.isArray((node as any)?.spine_gates) ? (node as any).spine_gates : [],
   );
   const [published, setPublished] = useState(node?.published ?? false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = () => {
     const errs: Record<string, string> = {};
-    if (!id.trim()) errs.id = 'ID is required';
-    else if (!/^[a-z0-9-]+$/.test(id)) errs.id = 'Use lowercase letters, numbers, and hyphens only';
-    if (!title.trim()) errs.title = 'Title is required';
+    if (!id.trim()) errs.id = "ID is required";
+    else if (!/^[a-z0-9-]+$/.test(id)) errs.id = "Use lowercase letters, numbers, and hyphens only";
+    if (!title.trim()) errs.title = "Title is required";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -73,12 +67,12 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
     await onSubmit({
       id: id.trim(),
       title: title.trim(),
-      alt_phrasings: altPhrasings.filter((p) => p.trim()) as unknown as Node['alt_phrasings'],
+      alt_phrasings: altPhrasings.filter((p) => p.trim()) as unknown as Node["alt_phrasings"],
       category: category.trim() || null,
       keywords: keywords.trim() || null,
       layer1: layer1.trim() || null,
-      layer2_json: serializeLayer2(layer2Bullets) as unknown as Node['layer2_json'],
-      layer3_json: serializeLayer3(layer3Data) as unknown as Node['layer3_json'],
+      layer2_json: serializeLayer2(layer2Bullets) as unknown as Node["layer2_json"],
+      layer3_json: serializeLayer3(layer3Data) as unknown as Node["layer3_json"],
       tier,
       spine_gates: spineGates,
       published,
@@ -87,13 +81,19 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
 
   const handleDownload = () => {
     const md = serializeNodeMarkdown({
-      id, title, category, keywords,
-      altPhrasings, published, layer1,
-      layer2Bullets, layer3Data,
+      id,
+      title,
+      category,
+      keywords,
+      altPhrasings,
+      published,
+      layer1,
+      layer2Bullets,
+      layer3Data,
     });
-    const blob = new Blob([md], { type: 'text/markdown' });
+    const blob = new Blob([md], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = `${id}.md`;
     a.click();
@@ -107,12 +107,15 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
           <Button variant="ghost" size="icon" onClick={onCancel}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <CardTitle className="font-display text-lg">
-            {isEditing ? 'Edit Node' : 'Create Node'}
-          </CardTitle>
+          <CardTitle className="font-display text-lg">{isEditing ? "Edit Node" : "Create Node"}</CardTitle>
           <div className="ml-auto flex items-center gap-1">
             {isEditing && (
-              <Button variant="ghost" size="icon" onClick={() => window.open(`/node/${id}/preview`, '_blank')} title="Preview">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => window.open(`/node/${id}/preview`, "_blank")}
+                title="Preview"
+              >
                 <Eye className="w-4 h-4" />
               </Button>
             )}
@@ -181,19 +184,26 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
                 id="tier"
                 type="number"
                 min={0}
-                max={6}
-                value={tier ?? ''}
-                onChange={(e) => setTier(e.target.value === '' ? null : parseInt(e.target.value))}
-                placeholder="0–6"
+                max={9}
+                value={tier ?? ""}
+                onChange={(e) => setTier(e.target.value === "" ? null : parseInt(e.target.value))}
+                placeholder="0–9"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="spine-gates">Spine Gates</Label>
               <Input
                 id="spine-gates"
-                value={spineGates.join(', ')}
-                onChange={(e) => setSpineGates(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                placeholder='e.g. S-04, S-16'
+                value={spineGates.join(", ")}
+                onChange={(e) =>
+                  setSpineGates(
+                    e.target.value
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean),
+                  )
+                }
+                placeholder="e.g. S-04, S-16"
               />
               <p className="text-xs text-muted-foreground">Comma-separated gate IDs</p>
             </div>
@@ -217,8 +227,8 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
 
           <div className="flex items-center gap-3 pt-2">
             <Switch id="published" checked={published} onCheckedChange={setPublished} disabled={!canPublish} />
-            <Label htmlFor="published" className={canPublish ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}>
-              {published ? 'Published' : 'Draft'}
+            <Label htmlFor="published" className={canPublish ? "cursor-pointer" : "cursor-not-allowed opacity-70"}>
+              {published ? "Published" : "Draft"}
             </Label>
             {!canPublish && (
               <span className="text-xs text-muted-foreground">Only editors can change publication status</span>
@@ -227,7 +237,7 @@ const NodeForm = ({ node, onSubmit, onCancel, loading, canPublish = true }: Node
 
           <div className="flex gap-3 pt-4">
             <Button type="submit" disabled={loading}>
-              {loading ? 'Saving…' : isEditing ? 'Update Node' : 'Create Node'}
+              {loading ? "Saving…" : isEditing ? "Update Node" : "Create Node"}
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel
